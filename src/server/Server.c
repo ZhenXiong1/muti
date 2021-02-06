@@ -89,9 +89,9 @@ static void serverDoActionCallback(SRequest *reqw, uint8_t error_id) {
 
 static void serverDoAction(Job *job) {
         SRequest *reqw = containerOf(job, SRequest, job);
-        RequestHandler *res = reqw->req_handler;
+        RequestHandler *handler = reqw->req_handler;
 
-        res->actions[reqw->request->request_id](reqw);
+        handler->actions[reqw->request->request_id](reqw);
 }
 
 static void serverReadCallback(Connection* conn_p, bool rc, void* buffer, size_t sz, void *cbarg);
@@ -146,12 +146,12 @@ static void serverReadCallback(Connection* conn_p, bool rc, void* buffer, size_t
                         rc = false;
                         goto out;
                 }
-                RequestHandler *res = &priv_p->param.request_handler[resource_id];
-                if (res == NULL) {
+                RequestHandler *handler = &priv_p->param.request_handler[resource_id];
+                if (handler == NULL) {
                         rc = false;
                         goto out;
                 }
-                RequestDecoder *req_decoders = res->request_decoders;
+                RequestDecoder *req_decoders = handler->request_decoders;
                 if (req_decoders == NULL) {
                         rc = false;
                         goto out;
@@ -171,7 +171,7 @@ static void serverReadCallback(Connection* conn_p, bool rc, void* buffer, size_t
                         reqw->connection = conn_p;
                         reqw->read_buffer = rbuf;
                         reqw->request = req;
-                        reqw->req_handler = res;
+                        reqw->req_handler = handler;
                         reqw->response = NULL;
                         reqw->free_req = free_req;
                         reqw->action_callback = serverDoActionCallback;

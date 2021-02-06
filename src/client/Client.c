@@ -29,6 +29,7 @@ static void clientOnClose(Connection *conn) {
         ClientPrivate *priv_p = obj->p;
 
         priv_p->conn = NULL;
+        // TODO waiting all response back
         DLOG("clientOnClose");
 }
 
@@ -36,9 +37,9 @@ static void clientOnConnect(Connection *conn) {
         Socket *socket = conn->m->getSocket(conn);
         Client* obj = socket->m->getContext(socket);
         ClientPrivate *priv_p = obj->p;
-
         priv_p->conn = conn;
         sem_post(&priv_p->sem);
+        // TODO start read job
 }
 
 typedef struct ClientSendArg {
@@ -49,11 +50,22 @@ typedef struct ClientSendArg {
 } ClientSendArg;
 
 static void clientWriteCallback(Connection *conn, bool rc, void *cbarg) {
+        Socket *socket = conn->m->getSocket(conn);
+        Client *obj = socket->m->getContext(socket);
+        ClientSendArg *send_arg = cbarg;
+
         if (rc == false) {
                 ELOG("Write failed!");
-                // TODO
+                Response *resp = malloc(sizeof(*resp));
+                resp->error_id = -1;
+                send_arg->callback(obj, resp, cbarg);
+                free(resp);
+                free(send_arg->buffer);
+                // TODO Remove send_arg from waiting response hash map
+                free(send_arg);
         } else {
                 DLOG("Client write success\n");
+                free(send_arg->buffer);
         }
 }
 
@@ -69,7 +81,7 @@ static bool clientSendRequest(Client* obj, Request* req, ClientSendCallback call
         ClientSendArg *send_arg = malloc(sizeof(*send_arg));
         send_arg->callback = callback;
         send_arg->arg = arg;
-        //TODO
+        //TODO add to waiting response hash table.
         bool rc = encoder(req, &send_arg->buffer, &send_arg->buffer_len, free_req);
         if (rc == false) {
                 *free_req = true;
