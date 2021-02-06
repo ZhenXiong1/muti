@@ -22,7 +22,6 @@ typedef struct myJob {
 void utJobDo(Job *job) {
         MyJob *myjob = (MyJob*)job;
         char msg[1024];
-        uint64_t out[2];
         int i;
 //        pthread_mutex_lock(&ut_lock);
         for (i = 0; i < 1000; i++) {
