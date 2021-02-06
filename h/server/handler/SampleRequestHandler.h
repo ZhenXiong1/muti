@@ -10,9 +10,9 @@
 #include <server/handler/RequestHandler.h>
 #include <stddef.h>
 
-extern void SampleActionGet(RequestW *);
-extern void SampleActionPut(RequestW *);
-extern void SampleActionList(RequestW *);
+extern void SampleActionGet(SRequest *);
+extern void SampleActionPut(SRequest *);
+extern void SampleActionList(SRequest *);
 
 extern Action SampleActions[];
 

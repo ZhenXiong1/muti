@@ -24,11 +24,12 @@ struct Server {
 };
 
 typedef struct ServerParam {
-        RequestHandler        *resource;
-        uint8_t         resource_length;
+        RequestHandler  *request_handler;
+        uint8_t         request_handler_length;
         ThreadPool      *worker_tp;
         int             port;
         size_t          read_buffer_size;
+        int             socket_io_thread_number;
 } ServerParam;
 
 bool initServer(Server*, ServerParam*);

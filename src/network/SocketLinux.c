@@ -866,7 +866,7 @@ bool initSocketLinux(Socket* socket_p, SocketLinuxParam* param) {
         if (rc == false) {
             free(priv_p);
         }
-	return true;
+	return rc;
 }
 
 #endif

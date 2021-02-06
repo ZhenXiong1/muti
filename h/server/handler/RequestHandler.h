@@ -21,10 +21,10 @@ typedef struct Readbuffer {
 } Readbuffer;
 
 typedef struct RequestHandler RequestHandler;
-typedef struct RequestW RequestW;
-typedef void (*ActionCallback)(RequestW *reqw, uint8_t error_id);
+typedef struct SRequest SRequest;
+typedef void (*ActionCallback)(SRequest *reqw, uint8_t error_id);
 
-struct RequestW {
+struct SRequest {
         Job             job;
         Request         *request;
         bool            free_req;
@@ -35,7 +35,7 @@ struct RequestW {
         ActionCallback  action_callback;
 };
 
-typedef void (*Action)(RequestW *);
+typedef void (*Action)(SRequest *);
 typedef Request* (*RequestDecoder)(char *buffer, size_t buff_len, size_t *consume_len, bool *free_req);
 typedef bool (*ResponseEncoder)(Response *resp, char **buffer, size_t *buff_len, bool *free_resp);
 

@@ -21,7 +21,7 @@ Action SampleActions[] = {
         SampleActionList,
 };
 
-void SampleActionGet(RequestW *req) {
+void SampleActionGet(SRequest *req) {
         SampleGetRequest *request = (SampleGetRequest*) req->request;
         Socket* socket = req->connection->m->getSocket(req->connection);
         Server* server = socket->m->getContext(socket);
@@ -45,7 +45,7 @@ void SampleActionGet(RequestW *req) {
         req->action_callback(req, resp->error_id);
 }
 
-void SampleActionPut(RequestW *req) {
+void SampleActionPut(SRequest *req) {
         SamplePutRequest *request = (SamplePutRequest*) req->request;
         Socket* socket = req->connection->m->getSocket(req->connection);
         Server* server = socket->m->getContext(socket);
@@ -62,7 +62,7 @@ void SampleActionPut(RequestW *req) {
         req->action_callback(req, resp->error_id);
 }
 
-void SampleActionList(RequestW *req) {
+void SampleActionList(SRequest *req) {
         SampleListRequest *request = (SampleListRequest*) req->request;
         Socket* socket = req->connection->m->getSocket(req->connection);
         Server* server = socket->m->getContext(socket);

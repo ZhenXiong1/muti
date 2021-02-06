@@ -51,7 +51,7 @@ static void serverWriteCallback(Connection* conn_p, bool rc, void *buffer) {
         free(buffer);
 }
 
-static void serverDoActionCallback(RequestW *reqw, uint8_t error_id) {
+static void serverDoActionCallback(SRequest *reqw, uint8_t error_id) {
         Connection* conn_p = reqw->connection;
         ConnectionContext *ccxt = conn_p->m->getContext(conn_p);
         char *buffer;
@@ -88,7 +88,7 @@ static void serverDoActionCallback(RequestW *reqw, uint8_t error_id) {
 }
 
 static void serverDoAction(Job *job) {
-        RequestW *reqw = containerOf(job, RequestW, job);
+        SRequest *reqw = containerOf(job, SRequest, job);
         RequestHandler *res = reqw->req_handler;
 
         res->actions[reqw->request->request_id](reqw);
@@ -153,11 +153,11 @@ static void serverReadCallback(Connection* conn_p, bool rc, void* buffer, size_t
                 }
                 if (request_type != RRTYPE_HTTP) {
                         resource_id = buf[1];
-                        if (resource_id > priv_p->param.resource_length) {
+                        if (resource_id > priv_p->param.request_handler_length) {
                                 rc = false;
                                 goto out;
                         }
-                        RequestHandler *res = &priv_p->param.resource[resource_id];
+                        RequestHandler *res = &priv_p->param.request_handler[resource_id];
                         if (res == NULL) {
                                 rc = false;
                                 goto out;
@@ -178,7 +178,7 @@ static void serverReadCallback(Connection* conn_p, bool rc, void* buffer, size_t
                         bool free_req;
                         Request *req = reqDecoder(buf, buf_len, &consume_len, &free_req);
                         if (req) {
-                                RequestW *reqw = malloc(sizeof(*reqw));
+                                SRequest *reqw = malloc(sizeof(*reqw));
                                 reqw->connection = conn_p;
                                 reqw->read_buffer = rbuf;
                                 reqw->request = req;
@@ -270,7 +270,7 @@ bool initServer(Server* obj, ServerParam* param) {
         ThreadPoolParam param_tp;
         memset(&param_tp, 0, sizeof(param_tp));
         param_tp.do_batch = NULL;
-        param_tp.thread_number = 6;
+        param_tp.thread_number = param->socket_io_thread_number;
         rc = initThreadPool(&priv_p->tp_read, &param_tp);
         assert(rc);
         rc = initThreadPool(&priv_p->tp_write, &param_tp);
