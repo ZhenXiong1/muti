@@ -16,16 +16,16 @@ extern void SampleActionList(SRequest *);
 
 extern Action SampleActions[];
 
-extern Request* SampleRequestDecoderCGet(char *buffer, size_t buff_len, size_t *consume_len, bool *free_req);
-extern Request* SampleRequestDecoderCPut(char *buffer, size_t buff_len, size_t *consume_len, bool *free_req);
-extern Request* SampleRequestDecoderCList(char *buffer, size_t buff_len, size_t *consume_len, bool *free_req);
+extern Request* SampleRequestDecoderGet(char *buffer, size_t buff_len, size_t *consume_len, bool *free_req);
+extern Request* SampleRequestDecoderPut(char *buffer, size_t buff_len, size_t *consume_len, bool *free_req);
+extern Request* SampleRequestDecoderList(char *buffer, size_t buff_len, size_t *consume_len, bool *free_req);
 
-extern RequestDecoder* SampleRequestDecoder[];
+extern RequestDecoder SampleRequestDecoder[];
 
-bool SampleResponseEncoderCGet(Response *resp, char **buffer, size_t *buff_len, bool *free_resp);
-bool SampleResponseEncoderCPut(Response *resp, char **buffer, size_t *buff_len, bool *free_resp);
-bool SampleResponseEncoderCList(Response *resp, char **buffer, size_t *buff_len, bool *free_resp);
+bool SampleResponseEncoderGet(Response *resp, char **buffer, size_t *buff_len, bool *free_resp);
+bool SampleResponseEncoderPut(Response *resp, char **buffer, size_t *buff_len, bool *free_resp);
+bool SampleResponseEncoderList(Response *resp, char **buffer, size_t *buff_len, bool *free_resp);
 
-extern ResponseEncoder* SampleResponseEncoder[];
+extern ResponseEncoder SampleResponseEncoder[];
 
 #endif /* RESSAMPLE_H_ */

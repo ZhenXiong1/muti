@@ -41,8 +41,8 @@ typedef bool (*ResponseEncoder)(Response *resp, char **buffer, size_t *buff_len,
 
 struct RequestHandler {
         Action          *actions;
-        RequestDecoder   **request_decoders;
-        ResponseEncoder  **response_encoders;
+        RequestDecoder   *request_decoders;
+        ResponseEncoder  *response_encoders;
 };
 
 #endif /* SERVER_HANDLER_REQUESTHANDLER_H_ */

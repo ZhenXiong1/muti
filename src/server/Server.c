@@ -61,10 +61,10 @@ static void serverDoActionCallback(SRequest *reqw, uint8_t error_id) {
         assert(reqw->response != NULL);
         if (error_id == 0) {
                 RequestHandler *res = reqw->req_handler;
-                res->response_encoders[reqw->request->request_type][reqw->request->request_id]
+                res->response_encoders[reqw->request->request_id]
                          (reqw->response, &buffer, &buff_len, &free_resp);
         } else {
-                errorResponseEncoder[reqw->request->request_type](reqw->response, &buffer, &buff_len, &free_resp);
+                ErrorResponseEncoder(reqw->response, &buffer, &buff_len, &free_resp);
         }
         __sync_add_and_fetch(&ccxt->write_counter, 1);
         bool rc = conn_p->m->write(conn_p, buffer, buff_len, serverWriteCallback, buffer);
@@ -118,8 +118,7 @@ static void serverReadCallback(Connection* conn_p, bool rc, void* buffer, size_t
         ServerPrivate *priv_p = srv->p;
         ConnectionContext *ccxt = conn_p->m->getContext(conn_p);
         Readbuffer *rbuf = cbarg;
-        uint8_t request_type;
-        uint8_t resource_id;
+        uint16_t resource_id;
         uint16_t request_id;
         char *buf;
         size_t buf_len;
@@ -141,64 +140,49 @@ static void serverReadCallback(Connection* conn_p, bool rc, void* buffer, size_t
                         serverRead(conn_p, priv_p, buf, buf_len);
                         break;
                 }
-
-                request_type = buf[0];
-                if (request_type == 'H') {
-                        request_type = RRTYPE_HTTP;
-                        buf[0] = RRTYPE_HTTP;
-                }
-                if (request_type >= RRTYPE_MAX) {
+                Request *req1 = (Request*)buf;
+                resource_id = req1->resource_id;
+                if (resource_id > priv_p->param.request_handler_length) {
                         rc = false;
                         goto out;
                 }
-                if (request_type != RRTYPE_HTTP) {
-                        resource_id = buf[1];
-                        if (resource_id > priv_p->param.request_handler_length) {
-                                rc = false;
-                                goto out;
-                        }
-                        RequestHandler *res = &priv_p->param.request_handler[resource_id];
-                        if (res == NULL) {
-                                rc = false;
-                                goto out;
-                        }
-                        RequestDecoder *req_decoders = res->request_decoders[request_type];
-                        if (req_decoders == NULL) {
-                                rc = false;
-                                goto out;
-                        }
-                        request_id = *(uint16_t *)&buf[2]; // TODO: High low bytes
-                        // TODO: Validate request id
-                        RequestDecoder reqDecoder = req_decoders[request_id];
-                        if (reqDecoder == NULL) {
-                                rc = false;
-                                goto out;
-                        }
-                        size_t consume_len;
-                        bool free_req;
-                        Request *req = reqDecoder(buf, buf_len, &consume_len, &free_req);
-                        if (req) {
-                                SRequest *reqw = malloc(sizeof(*reqw));
-                                reqw->connection = conn_p;
-                                reqw->read_buffer = rbuf;
-                                reqw->request = req;
-                                reqw->req_handler = res;
-                                reqw->response = NULL;
-                                reqw->free_req = free_req;
-                                reqw->action_callback = serverDoActionCallback;
-                                buf += consume_len;
-                                buf_len -= consume_len;
-                                __sync_add_and_fetch(&rbuf->running_request_counter, 1);
-                                reqw->job.doJob = serverDoAction;
-                                priv_p->param.worker_tp->m->insertTail(priv_p->param.worker_tp, &reqw->job);
-                        } else {
-                                serverRead(conn_p, priv_p, buf, buf_len);
-                                break;
-                        }
+                RequestHandler *res = &priv_p->param.request_handler[resource_id];
+                if (res == NULL) {
+                        rc = false;
+                        goto out;
+                }
+                RequestDecoder *req_decoders = res->request_decoders;
+                if (req_decoders == NULL) {
+                        rc = false;
+                        goto out;
+                }
+                request_id = req1->request_id; // TODO: High low bytes
+                // TODO: Validate request id
+                RequestDecoder reqDecoder = req_decoders[request_id];
+                if (reqDecoder == NULL) {
+                        rc = false;
+                        goto out;
+                }
+                size_t consume_len;
+                bool free_req;
+                Request *req = reqDecoder(buf, buf_len, &consume_len, &free_req);
+                if (req) {
+                        SRequest *reqw = malloc(sizeof(*reqw));
+                        reqw->connection = conn_p;
+                        reqw->read_buffer = rbuf;
+                        reqw->request = req;
+                        reqw->req_handler = res;
+                        reqw->response = NULL;
+                        reqw->free_req = free_req;
+                        reqw->action_callback = serverDoActionCallback;
+                        buf += consume_len;
+                        buf_len -= consume_len;
+                        __sync_add_and_fetch(&rbuf->running_request_counter, 1);
+                        reqw->job.doJob = serverDoAction;
+                        priv_p->param.worker_tp->m->insertTail(priv_p->param.worker_tp, &reqw->job);
                 } else {
-                        ELOG("Not support type(HTTP)!!");
-                        rc = false;
-                        goto out;
+                        serverRead(conn_p, priv_p, buf, buf_len);
+                        break;
                 }
         }
 out:

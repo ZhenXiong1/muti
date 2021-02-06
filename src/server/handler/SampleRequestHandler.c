@@ -32,12 +32,12 @@ void SampleActionGet(SRequest *req) {
         Response *resp;
         if (sample == NULL) {
                 resp = malloc(sizeof(*resp));
-                resp->response_type = request->super.request_type;
+                resp->sequence = request->super.sequence;
                 resp->error_id = 1;
         } else {
                 SampleGetResponse *resp1 = malloc(sizeof(*resp) + sample->path_length);
                 resp = &resp1->super;
-                resp->response_type = request->super.request_type;
+                resp->sequence = request->super.sequence;
                 resp->error_id = 0;
                 memcpy(&resp1->sample, sample, sizeof(*sample) + sample->path_length);
         }
@@ -55,7 +55,7 @@ void SampleActionPut(SRequest *req) {
         Response *resp;
 
         resp = malloc(sizeof(*resp));
-        resp->response_type = request->super.request_type;
+        resp->sequence = request->super.sequence;
         resp->error_id = (int8_t)sdao->m->putSample(sdao, sample);
 
         req->response = resp;
@@ -72,26 +72,20 @@ void SampleActionList(SRequest *req) {
 
         resp->length = sdao->m->listSample(sdao, &resp->sample_list, request->page, request->page_size);
 
-        resp->super.response_type = request->super.request_type;
+        resp->super.sequence = request->super.sequence;
         resp->super.error_id = 0;
 
         req->response = &resp->super;
         req->action_callback(req, resp->super.error_id);
 }
 
-static RequestDecoder SampleRequestDecoderC[] = {
-        SampleRequestDecoderCGet,
-        SampleRequestDecoderCPut,
-        SampleRequestDecoderCList,
+RequestDecoder SampleRequestDecoder[] = {
+        SampleRequestDecoderGet,
+        SampleRequestDecoderPut,
+        SampleRequestDecoderList,
 };
 
-RequestDecoder* SampleRequestDecoder[] = {
-        SampleRequestDecoderC,
-        NULL,
-        NULL,
-};
-
-Request* SampleRequestDecoderCGet(char *buffer, size_t buff_len, size_t *consume_len, bool *free_req) {
+Request* SampleRequestDecoderGet(char *buffer, size_t buff_len, size_t *consume_len, bool *free_req) {
         size_t req_len;
         SampleGetRequest *req = (SampleGetRequest*)buffer;
         req_len = sizeof(SampleGetRequest);
@@ -101,7 +95,7 @@ Request* SampleRequestDecoderCGet(char *buffer, size_t buff_len, size_t *consume
         return &req->super;
 }
 
-Request* SampleRequestDecoderCPut(char *buffer, size_t buff_len, size_t *consume_len, bool *free_req) {
+Request* SampleRequestDecoderPut(char *buffer, size_t buff_len, size_t *consume_len, bool *free_req) {
         size_t req_len;
         SamplePutRequest *req = (SamplePutRequest*)buffer;
         req_len = sizeof(SamplePutRequest) + req->sample.path_length;
@@ -112,7 +106,7 @@ Request* SampleRequestDecoderCPut(char *buffer, size_t buff_len, size_t *consume
         return &req->super;
 }
 
-Request* SampleRequestDecoderCList(char *buffer, size_t buff_len, size_t *consume_len, bool *free_req) {
+Request* SampleRequestDecoderList(char *buffer, size_t buff_len, size_t *consume_len, bool *free_req) {
         size_t req_len;
         SampleListRequest *req = (SampleListRequest*)buffer;
         req_len = sizeof(SampleListRequest);
@@ -122,19 +116,13 @@ Request* SampleRequestDecoderCList(char *buffer, size_t buff_len, size_t *consum
         return &req->super;
 }
 
-static ResponseEncoder SampleResponseEncoderC[] = {
-        SampleResponseEncoderCGet,
-        SampleResponseEncoderCPut,
-        SampleResponseEncoderCList,
+ResponseEncoder SampleResponseEncoder[] = {
+        SampleResponseEncoderGet,
+        SampleResponseEncoderPut,
+        SampleResponseEncoderList,
 };
 
-ResponseEncoder* SampleResponseEncoder[] = {
-        SampleResponseEncoderC,
-        NULL,
-        NULL,
-};
-
-bool SampleResponseEncoderCGet(Response *resp, char **buffer, size_t *buff_len, bool *free_resp) {
+bool SampleResponseEncoderGet(Response *resp, char **buffer, size_t *buff_len, bool *free_resp) {
         *buffer = (char*)resp;
         SampleGetResponse *get_resp = (SampleGetResponse*)resp;
         *buff_len = sizeof(SampleGetResponse) + get_resp->sample.path_length;
@@ -142,14 +130,14 @@ bool SampleResponseEncoderCGet(Response *resp, char **buffer, size_t *buff_len, 
         return true;
 }
 
-bool SampleResponseEncoderCPut(Response *resp, char **buffer, size_t *buff_len, bool *free_resp) {
+bool SampleResponseEncoderPut(Response *resp, char **buffer, size_t *buff_len, bool *free_resp) {
         *buffer = (char*)resp;
         *buff_len = sizeof(SamplePutResponse);
         *free_resp = false;
         return true;
 }
 
-bool SampleResponseEncoderCList(Response *resp, char **buffer, size_t *buff_len, bool *free_resp) {
+bool SampleResponseEncoderList(Response *resp, char **buffer, size_t *buff_len, bool *free_resp) {
         SampleListResponse *list_resp = (SampleListResponse*)resp;
         size_t buf_len = 0;
         char *buf;
@@ -157,13 +145,13 @@ bool SampleResponseEncoderCList(Response *resp, char **buffer, size_t *buff_len,
         buf = malloc(sizeof(Response) + sizeof(list_resp->length) + list_resp->length * (sizeof(Sample) + 1024));
         *buffer = buf;
 
-        *(uint8_t*)buf = resp->response_type;
-        buf += 1;
-        buf_len += 1;
-
         *(int8_t*)buf = resp->error_id;
         buf += 1;
         buf_len += 1;
+
+        *(uint32_t*)buf = resp->sequence;
+        buf += 4;
+        buf_len += 4;
 
         *(uint32_t*)buf = list_resp->length;
         buf += sizeof(uint32_t);

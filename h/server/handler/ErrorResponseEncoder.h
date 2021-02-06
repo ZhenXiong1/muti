@@ -10,10 +10,6 @@
 #include <server/handler/RequestHandler.h>
 #include <stdbool.h>
 
-bool ErrorResponseEncoderC(Response *resp, char **buffer, size_t *buff_len, bool *free_resp);
-bool ErrorResponseEncoderJava(Response *resp, char **buffer, size_t *buff_len, bool *free_resp);
-bool ErrorResponseEncoderHttp(Response *resp, char **buffer, size_t *buff_len, bool *free_resp);
-
-extern ResponseEncoder errorResponseEncoder[];
+bool ErrorResponseEncoder(Response *resp, char **buffer, size_t *buff_len, bool *free_resp);
 
 #endif /* SERVER_HANDLER_ERRORRESPONSEENCODER_H_ */
