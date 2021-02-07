@@ -14,12 +14,6 @@
 #include <network/Connection.h>
 #include <res/Resource.h>
 
-typedef struct Readbuffer {
-        char                    *buffer;
-        off_t                   read_buffer_start;
-        volatile uint32_t       running_request_counter;
-} Readbuffer;
-
 typedef struct RequestHandler RequestHandler;
 typedef struct SRequest SRequest;
 typedef void (*ActionCallback)(SRequest *reqw, uint8_t error_id);

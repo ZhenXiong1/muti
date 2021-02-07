@@ -25,12 +25,12 @@ typedef struct ServerPrivate {
         ThreadPool      tp_write;
 } ServerPrivate;
 
-typedef struct ConnectionContext {
+typedef struct SConnectionContext {
         volatile uint64_t       read_counter;
         volatile uint64_t       read_done_counter;
         volatile uint64_t       write_counter;
         volatile uint64_t       write_done_counter;
-} ConnectionContext;
+} SConnectionContext;
 
 
 static Readbuffer* serverCreateReadBuffer(ServerPrivate *priv_p) {
@@ -38,12 +38,12 @@ static Readbuffer* serverCreateReadBuffer(ServerPrivate *priv_p) {
 
         rbuf->buffer = malloc(priv_p->param.read_buffer_size);
         rbuf->read_buffer_start = 0;
-        rbuf->running_request_counter = 0;
+        rbuf->reference = 0;
         return rbuf;
 }
 
 static void serverWriteCallback(Connection* conn_p, bool rc, void *buffer) {
-        ConnectionContext *ccxt = conn_p->m->getContext(conn_p);
+        SConnectionContext *ccxt = conn_p->m->getContext(conn_p);
         if (rc == false) {
                 ELOG("error send buffer!!");
         }
@@ -53,7 +53,7 @@ static void serverWriteCallback(Connection* conn_p, bool rc, void *buffer) {
 
 static void serverDoActionCallback(SRequest *reqw, uint8_t error_id) {
         Connection* conn_p = reqw->connection;
-        ConnectionContext *ccxt = conn_p->m->getContext(conn_p);
+        SConnectionContext *ccxt = conn_p->m->getContext(conn_p);
         char *buffer;
         size_t buff_len;
         bool free_resp;
@@ -78,7 +78,7 @@ static void serverDoActionCallback(SRequest *reqw, uint8_t error_id) {
         if (reqw->free_req) {
                 free(reqw->request);
         }
-        uint32_t left = __sync_sub_and_fetch(&reqw->read_buffer->running_request_counter, 1);
+        uint32_t left = __sync_sub_and_fetch(&reqw->read_buffer->reference, 1);
         if (left == 0) {
                 free(reqw->read_buffer->buffer);
                 free(reqw->read_buffer);
@@ -97,7 +97,7 @@ static void serverDoAction(Job *job) {
 static void serverReadCallback(Connection* conn_p, bool rc, void* buffer, size_t sz, void *cbarg);
 
 static inline void serverRead(Connection* conn_p, ServerPrivate *priv_p, char *buf, size_t buf_len) {
-        ConnectionContext *ccxt = conn_p->m->getContext(conn_p);
+        SConnectionContext *ccxt = conn_p->m->getContext(conn_p);
         Readbuffer *rbuf = serverCreateReadBuffer(priv_p);
         memcpy(rbuf->buffer, buf, buf_len);
         rbuf->read_buffer_start = buf_len;
@@ -116,7 +116,7 @@ static void serverReadCallback(Connection* conn_p, bool rc, void* buffer, size_t
         Socket* skt = conn_p->m->getSocket(conn_p);
         Server* srv = skt->m->getContext(skt);
         ServerPrivate *priv_p = srv->p;
-        ConnectionContext *ccxt = conn_p->m->getContext(conn_p);
+        SConnectionContext *ccxt = conn_p->m->getContext(conn_p);
         Readbuffer *rbuf = cbarg;
         uint16_t resource_id;
         uint16_t request_id;
@@ -133,7 +133,7 @@ static void serverReadCallback(Connection* conn_p, bool rc, void* buffer, size_t
 
         buf = rbuf->buffer;
         buf_len = rbuf->read_buffer_start + sz;
-        rbuf->running_request_counter = 1;
+        rbuf->reference = 1;
 
         while(true) {
                 if (buf_len < 4) {
@@ -177,7 +177,7 @@ static void serverReadCallback(Connection* conn_p, bool rc, void* buffer, size_t
                         reqw->action_callback = serverDoActionCallback;
                         buf += consume_len;
                         buf_len -= consume_len;
-                        __sync_add_and_fetch(&rbuf->running_request_counter, 1);
+                        __sync_add_and_fetch(&rbuf->reference, 1);
                         reqw->job.doJob = serverDoAction;
                         priv_p->param.worker_tp->m->insertTail(priv_p->param.worker_tp, &reqw->job);
                 } else {
@@ -186,7 +186,7 @@ static void serverReadCallback(Connection* conn_p, bool rc, void* buffer, size_t
                 }
         }
 out:
-        left = __sync_sub_and_fetch(&rbuf->running_request_counter, 1);
+        left = __sync_sub_and_fetch(&rbuf->reference, 1);
         if (left == 0) {
                 free(rbuf->buffer);
                 free(rbuf);
@@ -199,7 +199,7 @@ static void serverOnConnect(Connection *conn) {
         Socket* skt = conn->m->getSocket(conn);
         Server* srv = skt->m->getContext(skt);
         ServerPrivate *priv_p = srv->p;
-        ConnectionContext *ccxt = calloc(1, sizeof(ConnectionContext));
+        SConnectionContext *ccxt = calloc(1, sizeof(SConnectionContext));
         Readbuffer *rbuf = serverCreateReadBuffer(priv_p);
 
         conn->m->setContext(conn, ccxt);
@@ -210,7 +210,7 @@ static void serverOnConnect(Connection *conn) {
 }
 
 static void serverOnClose(Connection *conn) {
-        ConnectionContext *ccxt;
+        SConnectionContext *ccxt;
         ccxt = conn->m->getContext(conn);
         while (ccxt->read_counter != ccxt->read_done_counter) {
                 WLOG("Waiting read response, request counter:%lu, response counter:%lu.", ccxt->read_counter, ccxt->read_done_counter);
