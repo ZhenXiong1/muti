@@ -10,7 +10,7 @@
 #include <string.h>
 #include <assert.h>
 
-#include <server/handler/ErrorResponseEncoder.h>
+#include <server/handler/RequestHandler.h>
 
 bool ErrorResponseEncoder(Response *resp, char **buffer, size_t *buff_len, bool *free_resp) {
         *buff_len = sizeof(*resp);

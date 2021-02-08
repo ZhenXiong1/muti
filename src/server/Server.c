@@ -15,7 +15,6 @@
 #include <network/Socket.h>
 #include <util/ThreadPool.h>
 #include <Log.h>
-#include <server/handler/ErrorResponseEncoder.h>
 
 typedef struct ServerPrivate {
         ServerParam     param;
@@ -51,7 +50,7 @@ static void serverWriteCallback(Connection* conn_p, bool rc, void *buffer) {
         free(buffer);
 }
 
-static void serverDoActionCallback(SRequest *reqw, uint8_t error_id) {
+static void serverDoActionCallback(SRequest *reqw) {
         Connection* conn_p = reqw->connection;
         SConnectionContext *ccxt = conn_p->m->getContext(conn_p);
         char *buffer;
@@ -59,6 +58,7 @@ static void serverDoActionCallback(SRequest *reqw, uint8_t error_id) {
         bool free_resp;
 
         assert(reqw->response != NULL);
+        int8_t error_id = reqw->response->error_id;
         if (error_id == 0) {
                 RequestHandler *res = reqw->req_handler;
                 res->response_encoders[reqw->request->request_id]

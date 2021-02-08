@@ -38,10 +38,19 @@ typedef struct CConnectionContext {
 } CConnectionContext;
 
 typedef struct ClientSendArg {
-        ListElement             element;
+        union {
+                ListElement     element;
+                Job             job;
+        };
+        Readbuffer              *rbuf;
+        Response                *response;
+        bool                    free_resp;
         uint32_t                sequence;
+
         char                    *buffer;
         size_t                  buffer_len;
+        ResponseDecoder         decoder;
+        Connection              *conn;
         ClientSendCallback      callback;
         void                    *arg;
 } ClientSendArg;
@@ -70,7 +79,7 @@ static void clientOnClose(Connection *conn) {
         free(ccxt);
 
         err_resp.error_id = -4;
-        err_resp.sequence = 0;
+        err_resp.sequence = 1;
         for (i = 0; i < CLIENT_WAITING_HASH_LEN; i++) {
                 slot = &priv_p->waiting_hash_slots[i];
                 lock = &priv_p->waiting_hash_locks[i];
@@ -89,6 +98,136 @@ static void clientOnClose(Connection *conn) {
         DLOG("clientOnClose");
 }
 
+static Readbuffer* clientCreateReadBuffer(ClientPrivate *priv_p) {
+        Readbuffer *rbuf = malloc(sizeof(*rbuf));
+
+        rbuf->buffer = malloc(priv_p->param.read_buffer_size);
+        rbuf->read_buffer_start = 0;
+        rbuf->reference = 0;
+        return rbuf;
+}
+
+static void clientReadCallback(Connection* conn_p, bool rc, void* buffer, size_t sz, void *cbarg);
+
+static inline void clientRead(Connection* conn_p, ClientPrivate *priv_p, char *buf, size_t buf_len) {
+        CConnectionContext *ccxt = conn_p->m->getContext(conn_p);
+        Readbuffer *rbuf = clientCreateReadBuffer(priv_p);
+
+        memcpy(rbuf->buffer, buf, buf_len);
+        rbuf->read_buffer_start = buf_len;
+        __sync_add_and_fetch(&ccxt->read_counter, 1);
+        bool rrc = conn_p->m->read(conn_p, rbuf->buffer + rbuf->read_buffer_start,
+                        priv_p->param.read_buffer_size - rbuf->read_buffer_start,
+                        clientReadCallback, rbuf);
+        if (rrc == false) {
+                free(rbuf->buffer);
+                free(rbuf);
+                __sync_add_and_fetch(&ccxt->read_done_counter, 1);
+        }
+}
+
+static void clientDoJob(Job *job) {
+        ClientSendArg *send_arg = containerOf(job, ClientSendArg, job);
+        Connection *conn_p = send_arg->conn;
+        Socket* skt = conn_p->m->getSocket(conn_p);
+        Client* obj = skt->m->getContext(skt);
+        CConnectionContext *ccxt = conn_p->m->getContext(conn_p);
+
+        send_arg->callback(obj, send_arg->response, send_arg->arg);
+        Readbuffer *rbuf = send_arg->rbuf;
+        uint32_t left = __sync_sub_and_fetch(&rbuf->reference, 1);
+        if (left == 0) {
+                free(rbuf->buffer);
+                free(rbuf);
+                __sync_add_and_fetch(&ccxt->read_done_counter, 1);
+        }
+        if (send_arg->free_resp) {
+                free(send_arg->response);
+        }
+}
+
+static void clientReadCallback(Connection* conn_p, bool rc, void* buffer, size_t sz, void *cbarg) {
+        Socket* skt = conn_p->m->getSocket(conn_p);
+        Client* obj = skt->m->getContext(skt);
+        ClientPrivate *priv_p = obj->p;
+        ThreadPool *work_tp = priv_p->param.worker_tp;
+        CConnectionContext *ccxt = conn_p->m->getContext(conn_p);
+        Readbuffer *rbuf = cbarg;
+        char *buf;
+        size_t buf_len;
+        uint32_t left;
+
+        if (rc == false) {
+                free(rbuf->buffer);
+                free(rbuf);
+                __sync_add_and_fetch(&ccxt->read_done_counter, 1);
+                return;
+        }
+
+        buf = rbuf->buffer;
+        buf_len = rbuf->read_buffer_start + sz;
+        rbuf->reference = 1;
+
+        while(true) {
+                if (buf_len < sizeof(Response)) {
+                        clientRead(conn_p, priv_p, buf, buf_len);
+                        break;
+                }
+                ClientSendArg *send_arg, *send_arg1;
+                Response *resp = (Response*)buf;
+                uint32_t hash = resp->sequence & (CLIENT_WAITING_HASH_LEN - 1);
+                pthread_mutex_t *lock = &priv_p->waiting_hash_locks[hash];
+                ListHead *slot = &priv_p->waiting_hash_slots[hash];
+                bool got_it = false;
+                pthread_mutex_lock(lock);
+                listForEachEntrySafe(send_arg, send_arg1, slot, element) {
+                        if (send_arg->sequence == resp->sequence) {
+                                got_it = true;
+                                listDel(&send_arg->element);
+                                break;
+                        }
+                }
+                pthread_mutex_unlock(lock);
+                if (got_it == false) {
+                        rc = false;
+                        goto out;
+                }
+
+                size_t consume_len;
+                bool free_resp;
+                if (resp->error_id) {
+                        resp = ErrorResponseDecoder(buf, buf_len, &consume_len, &free_resp);
+                } else {
+                        resp = send_arg->decoder(buf, buf_len, &consume_len, &free_resp);
+                }
+                if (resp) {
+                        buf += consume_len;
+                        buf_len -= consume_len;
+                        __sync_add_and_fetch(&rbuf->reference, 1);
+                        send_arg->rbuf = rbuf;
+                        send_arg->response = resp;
+                        send_arg->free_resp = free_resp;
+                        send_arg->job.doJob = clientDoJob;
+                        send_arg->conn = conn_p;
+                        work_tp->m->insertTail(work_tp, &send_arg->job);
+                } else {
+                        pthread_mutex_lock(lock);
+                        listAdd(&send_arg->element, slot);
+                        pthread_mutex_unlock(lock);
+                        clientRead(conn_p, priv_p, buf, buf_len);
+                        break;
+                }
+        }
+out:
+        left = __sync_sub_and_fetch(&rbuf->reference, 1);
+        if (left == 0) {
+                free(rbuf->buffer);
+                free(rbuf);
+                __sync_add_and_fetch(&ccxt->read_done_counter, 1);
+        }
+        if (rc == false) conn_p->m->close(conn_p);
+}
+
 static void clientOnConnect(Connection *conn) {
         Socket *socket = conn->m->getSocket(conn);
         Client* obj = socket->m->getContext(socket);
@@ -98,7 +237,13 @@ static void clientOnConnect(Connection *conn) {
         conn->m->setContext(conn, ctx);
 
         sem_post(&priv_p->sem);
-        // TODO start read job
+
+        Readbuffer *rbuf = clientCreateReadBuffer(priv_p);
+        ctx->read_counter ++;
+        conn->m->read(conn, rbuf->buffer,
+                        priv_p->param.read_buffer_size,
+                        clientReadCallback, rbuf);
+
 }
 
 static void clientWriteCallback(Connection *conn, bool rc, void *cbarg) {
@@ -141,12 +286,14 @@ static bool clientSendRequest(Client* obj, Request* req, ClientSendCallback call
         CConnectionContext *ccxt = conn->m->getContext(conn);
         RequestSender *sender = &priv_p->param.request_sender[req->resource_id];
         RequestEncoder encoder = sender->request_encoders[req->request_id];
+        ResponseDecoder decoder = sender->response_decoders[req->request_id];
         ClientSendArg *send_arg = malloc(sizeof(*send_arg));
 
         send_arg->callback = callback;
         send_arg->arg = arg;
-        req->sequence = __sync_fetch_and_add(&priv_p->sequence, 1);
+        req->sequence = __sync_add_and_fetch(&priv_p->sequence, 1);
         send_arg->sequence = req->sequence;
+        send_arg->decoder = decoder;
 
         bool rc = encoder(req, &send_arg->buffer, &send_arg->buffer_len, free_req);
         if (rc == false) {
@@ -232,6 +379,7 @@ bool initClient(Client* obj, ClientParam* param) {
                 goto out;
         }
         sem_wait(&priv_p->sem);
+        sem_destroy(&priv_p->sem);
 out:
         return rc;
 }

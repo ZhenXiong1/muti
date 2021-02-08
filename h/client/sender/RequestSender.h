@@ -23,4 +23,6 @@ struct RequestSender {
         ResponseDecoder *response_decoders;
 };
 
+extern Response* ErrorResponseDecoder(char *buffer, size_t buff_len, size_t *consume_len, bool *free_resp);
+
 #endif /* CLIENT_SENDER_REQUESTSENDER_H_ */

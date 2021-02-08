@@ -42,7 +42,7 @@ void SampleActionGet(SRequest *req) {
                 memcpy(&resp1->sample, sample, sizeof(*sample) + sample->path_length);
         }
         req->response = resp;
-        req->action_callback(req, resp->error_id);
+        req->action_callback(req);
 }
 
 void SampleActionPut(SRequest *req) {
@@ -59,7 +59,7 @@ void SampleActionPut(SRequest *req) {
         resp->error_id = (int8_t)sdao->m->putSample(sdao, sample);
 
         req->response = resp;
-        req->action_callback(req, resp->error_id);
+        req->action_callback(req);
 }
 
 void SampleActionList(SRequest *req) {
@@ -76,7 +76,7 @@ void SampleActionList(SRequest *req) {
         resp->super.error_id = 0;
 
         req->response = &resp->super;
-        req->action_callback(req, resp->super.error_id);
+        req->action_callback(req);
 }
 
 RequestDecoder SampleRequestDecoder[] = {

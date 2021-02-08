@@ -16,7 +16,7 @@
 
 typedef struct RequestHandler RequestHandler;
 typedef struct SRequest SRequest;
-typedef void (*ActionCallback)(SRequest *reqw, uint8_t error_id);
+typedef void (*ActionCallback)(SRequest *);
 
 struct SRequest {
         Job             job;
@@ -38,5 +38,7 @@ struct RequestHandler {
         RequestDecoder   *request_decoders;
         ResponseEncoder  *response_encoders;
 };
+
+extern bool ErrorResponseEncoder(Response *resp, char **buffer, size_t *buff_len, bool *free_resp);
 
 #endif /* SERVER_HANDLER_REQUESTHANDLER_H_ */
