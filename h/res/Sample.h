@@ -49,7 +49,10 @@ typedef struct SampleListRequest {
 typedef struct SampleListResponse {
         Response        super;
         uint32_t        length;
-        ListHead        *sample_list;
+        union {
+        	ListHead	sample_head;	// For decoder
+        	ListHead        *sample_list;	// For encoder
+        };
 } SampleListResponse;
 
 #endif /* RES_SAMPLE_H_ */
