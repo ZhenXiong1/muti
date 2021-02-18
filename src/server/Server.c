@@ -276,7 +276,7 @@ bool initServer(Server* this, ServerParam* param) {
 
         rc = initSocketLinux(&priv_p->socket, &linux_param);
         assert(rc);
-        return 0;
+        return true;
 }
 
 

@@ -280,12 +280,11 @@ static void clientWriteCallback(Connection *conn, bool rc, void *cbarg) {
 
 static bool clientSendRequest(Client* this, Request* req, ClientSendCallback callback, void *arg, bool *free_req) {
         ClientPrivate *priv_p = this->p;
-        Connection *conn = priv_p->conn;
-        if (conn == NULL) {
+        Connection *conn_p = priv_p->conn;
+        if (conn_p == NULL) {
                 return false;
         }
 
-        CConnectionContext *ccxt = conn->m->getContext(conn);
         RequestSender *sender = &priv_p->param.request_sender[req->resource_id];
         RequestEncoder encoder = sender->request_encoders[req->request_id];
         ResponseDecoder decoder = sender->response_decoders[req->request_id];
@@ -310,10 +309,12 @@ static bool clientSendRequest(Client* this, Request* req, ClientSendCallback cal
         pthread_mutex_lock(lock);
         listAddTail(&send_arg->element, slot);
         pthread_mutex_unlock(lock);
+
+        CConnectionContext *ccxt = conn_p->m->getContext(conn_p);
         __sync_add_and_fetch(&ccxt->write_counter, 1);
 
-        rc = conn->m->write(conn, send_arg->wbuf, send_arg->wbuf_len, clientWriteCallback, send_arg);
-        if (rc) {
+        rc = conn_p->m->write(conn_p, send_arg->wbuf, send_arg->wbuf_len, clientWriteCallback, send_arg);
+        if (rc == false) {
                 __sync_add_and_fetch(&ccxt->write_done_counter, 1);
                 pthread_mutex_lock(lock);
                 listDel(&send_arg->element);

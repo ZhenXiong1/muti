@@ -11,6 +11,7 @@
 
 #include <server/dao/SampleDao.h>
 #include <util/Map.h>
+#include <Log.h>
 
 typedef struct SampleDaoPrivate {
         SampleDaoParam          param;
@@ -35,8 +36,10 @@ static int putSample(SampleDao* this, Sample *sample) {
                 map->m->put(map, &s->id, s);
                 listAddTail(&s->element, &priv_p->list);
                 priv_p->list_size++;
+                DLOG("Add new sample, id:%d", s->id);
         } else {
                 memcpy(s, sample, sizeof(*s) + sample->path_length);
+                DLOG("Replace old sample, id:%d", s->id);
         }
         return 0;
 }

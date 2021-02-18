@@ -21,6 +21,12 @@ typedef struct Sample {
         char            data[];
 } Sample;
 
+typedef enum {
+        SampleRequestIdGet = 0,
+        SampleRequestIdPut = 1,
+        SampleRequestIdList = 2,
+} SampleRequestId;
+
 typedef struct SampleGetRequest {
         Request         super;
         int             id;

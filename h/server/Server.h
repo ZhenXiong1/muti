@@ -25,7 +25,7 @@ struct Server {
 
 typedef struct ServerParam {
         RequestHandler  *request_handler;
-        uint8_t         request_handler_length;
+        uint16_t        request_handler_length;
         ThreadPool      *worker_tp;
         int             port;
         size_t          read_buffer_size;

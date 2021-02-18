@@ -27,7 +27,7 @@ bool SampleRequestEncoderGet(Request *req, char **buffer, size_t *buff_len, bool
 bool SampleRequestEncoderPut(Request *req, char **buffer, size_t *buff_len, bool *free_req) {
 	SamplePutRequest *req1 = (SamplePutRequest*)req;
 	*buffer = (char*) req1;
-	*buff_len = sizeof(*req1);
+	*buff_len = sizeof(*req1) + req1->sample.path_length;
 	*free_req = false;
         return true;
 }

@@ -28,4 +28,8 @@ typedef struct Readbuffer {
         volatile uint32_t       reference;
 } Readbuffer;
 
+typedef enum {
+        ResourceIdSample = 0
+} ResourceId;
+
 #endif /* RES_RESOURCE_H_ */

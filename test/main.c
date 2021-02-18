@@ -17,6 +17,8 @@ int UtSocketServer(int argv, char **argvs);
 int UtSocketClient(int argv, char **argvs);
 int UtSocketServer2(int argv, char **argvs);
 int UtSocketClient2(int argv, char **argvs);
+int UtClient(int argv, char **argvs);
+int UtServer(int argv, char **argvs);
 
 struct TestCase TestCases[] = {
         {"UtThreadPool", UtThreadPool},
@@ -25,6 +27,8 @@ struct TestCase TestCases[] = {
         {"UtSocketClient", UtSocketClient},
         {"UtSocketServer2", UtSocketServer2},
         {"UtSocketClient2", UtSocketClient2},
+        {"UtServer", UtServer},
+        {"UtClient", UtClient},
         {(char *)NULL, (TestCaseFn)NULL}
 };
 
