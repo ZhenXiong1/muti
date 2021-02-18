@@ -19,14 +19,14 @@ typedef struct SampleDaoPrivate {
         int                     list_size;
 } SampleDaoPrivate;
 
-static Sample* getSample(SampleDao* obj, int id) {
-        SampleDaoPrivate *priv_p = obj->p;
+static Sample* getSample(SampleDao* this, int id) {
+        SampleDaoPrivate *priv_p = this->p;
         Map *map = &priv_p->map;
         return map->m->get(map, &id);
 }
 
-static int putSample(SampleDao* obj, Sample *sample) {
-        SampleDaoPrivate *priv_p = obj->p;
+static int putSample(SampleDao* this, Sample *sample) {
+        SampleDaoPrivate *priv_p = this->p;
         Map *map = &priv_p->map;
         Sample *s = map->m->get(map, &sample->id);
         if (s == NULL) {
@@ -43,8 +43,8 @@ static int putSample(SampleDao* obj, Sample *sample) {
 
 #define min(a, b) (a) < (b) ? (a) : (b)
 
-static int listSample(SampleDao* obj, ListHead **head, int page, int page_size) {
-        SampleDaoPrivate *priv_p = obj->p;
+static int listSample(SampleDao* this, ListHead **head, int page, int page_size) {
+        SampleDaoPrivate *priv_p = this->p;
         int offset = page * page_size;
         int off = 0;
         Sample *s;
@@ -61,8 +61,8 @@ static int listSample(SampleDao* obj, ListHead **head, int page, int page_size) 
         return min(left, page_size);
 }
 
-static void destroy(SampleDao* obj) {
-        SampleDaoPrivate *priv_p = obj->p;
+static void destroy(SampleDao* this) {
+        SampleDaoPrivate *priv_p = this->p;
         Map *map = &priv_p->map;
         Sample **values = malloc(sizeof(void*) * priv_p->list_size);
         int i;
@@ -91,13 +91,13 @@ static uint64_t SampleHashMethod(void *key) {
         return (uint64_t)(*(int *)key);
 }
 
-bool initSampleDao(SampleDao* obj, SampleDaoParam* param) {
+bool initSampleDao(SampleDao* this, SampleDaoParam* param) {
         MapHashLinkedParam map_param;
         bool rc;
         SampleDaoPrivate *priv_p = malloc(sizeof(*priv_p));
 
-        obj->p = priv_p;
-        obj->m = &method;
+        this->p = priv_p;
+        this->m = &method;
         memcpy(&priv_p->param, param, sizeof(*param));
 
         listHeadInit(&priv_p->list);

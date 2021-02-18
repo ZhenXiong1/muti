@@ -47,9 +47,10 @@ typedef struct ClientSendArg {
         bool                    free_resp;
         uint32_t                sequence;
 
-        char                    *buffer;
-        size_t                  buffer_len;
+        char                    *wbuf;
+        size_t                  wbuf_len;
         ResponseDecoder         decoder;
+
         Connection              *conn;
         ClientSendCallback      callback;
         void                    *arg;
@@ -58,11 +59,11 @@ typedef struct ClientSendArg {
 static void clientOnClose(Connection *conn) {
         Socket *socket = conn->m->getSocket(conn);
         CConnectionContext *ccxt = conn->m->getContext(conn);
-        Client* obj = socket->m->getContext(socket);
-        ClientPrivate *priv_p = obj->p;
+        Client* this = socket->m->getContext(socket);
+        ClientPrivate *priv_p = this->p;
         ListHead *slot;
         pthread_mutex_t *lock;
-        ClientSendArg *arg, *arg1;
+        ClientSendArg *send_arg, *arg1;
         Response err_resp;
         int i;
 
@@ -79,19 +80,19 @@ static void clientOnClose(Connection *conn) {
         free(ccxt);
 
         err_resp.error_id = -4;
-        err_resp.sequence = 1;
+        err_resp.sequence = (uint32_t)-1;
         for (i = 0; i < CLIENT_WAITING_HASH_LEN; i++) {
                 slot = &priv_p->waiting_hash_slots[i];
                 lock = &priv_p->waiting_hash_locks[i];
                 pthread_mutex_lock(lock);
-                listForEachEntrySafe(arg, arg1, slot, element) {
-                        listDel(&arg->element);
-                        arg->callback(obj, &err_resp, arg->arg);
-                        if (arg->buffer) {
-                                free(arg->buffer);
-                                arg->buffer = NULL;
+                listForEachEntrySafe(send_arg, arg1, slot, element) {
+                        listDel(&send_arg->element);
+                        send_arg->callback(this, &err_resp, send_arg->arg);
+                        if (send_arg->wbuf) {
+                                free(send_arg->wbuf);
+                                send_arg->wbuf = NULL;
                         }
-                        free(arg);
+                        free(send_arg);
                 }
                 pthread_mutex_unlock(lock);
         }
@@ -130,10 +131,10 @@ static void clientDoJob(Job *job) {
         ClientSendArg *send_arg = containerOf(job, ClientSendArg, job);
         Connection *conn_p = send_arg->conn;
         Socket* skt = conn_p->m->getSocket(conn_p);
-        Client* obj = skt->m->getContext(skt);
+        Client* this = skt->m->getContext(skt);
         CConnectionContext *ccxt = conn_p->m->getContext(conn_p);
 
-        send_arg->callback(obj, send_arg->response, send_arg->arg);
+        send_arg->callback(this, send_arg->response, send_arg->arg);
         Readbuffer *rbuf = send_arg->rbuf;
         uint32_t left = __sync_sub_and_fetch(&rbuf->reference, 1);
         if (left == 0) {
@@ -144,12 +145,13 @@ static void clientDoJob(Job *job) {
         if (send_arg->free_resp) {
                 free(send_arg->response);
         }
+        free(send_arg);
 }
 
 static void clientReadCallback(Connection* conn_p, bool rc, void* buffer, size_t sz, void *cbarg) {
         Socket* skt = conn_p->m->getSocket(conn_p);
-        Client* obj = skt->m->getContext(skt);
-        ClientPrivate *priv_p = obj->p;
+        Client* this = skt->m->getContext(skt);
+        ClientPrivate *priv_p = this->p;
         ThreadPool *work_tp = priv_p->param.worker_tp;
         CConnectionContext *ccxt = conn_p->m->getContext(conn_p);
         Readbuffer *rbuf = cbarg;
@@ -230,9 +232,9 @@ out:
 
 static void clientOnConnect(Connection *conn) {
         Socket *socket = conn->m->getSocket(conn);
-        Client* obj = socket->m->getContext(socket);
+        Client* this = socket->m->getContext(socket);
         CConnectionContext *ctx = calloc(1, sizeof(CConnectionContext));
-        ClientPrivate *priv_p = obj->p;
+        ClientPrivate *priv_p = this->p;
         priv_p->conn = conn;
         conn->m->setContext(conn, ctx);
 
@@ -248,10 +250,10 @@ static void clientOnConnect(Connection *conn) {
 
 static void clientWriteCallback(Connection *conn, bool rc, void *cbarg) {
         Socket *socket = conn->m->getSocket(conn);
-        Client *obj = socket->m->getContext(socket);
+        Client *this = socket->m->getContext(socket);
         CConnectionContext *ccxt = conn->m->getContext(conn);
         pthread_mutex_t *lock;
-        ClientPrivate *priv_p = obj->p;
+        ClientPrivate *priv_p = this->p;
         ClientSendArg *send_arg = cbarg;
 
         if (rc == false) {
@@ -265,19 +267,19 @@ static void clientWriteCallback(Connection *conn, bool rc, void *cbarg) {
 
                 Response resp;
                 resp.error_id = -3;
-                send_arg->callback(obj, &resp, cbarg);
-                free(send_arg->buffer);
+                send_arg->callback(this, &resp, cbarg);
+                free(send_arg->wbuf);
                 free(send_arg);
         } else {
                 DLOG("Client write success\n");
-                free(send_arg->buffer);
-                send_arg->buffer = NULL;
+                free(send_arg->wbuf);
+                send_arg->wbuf = NULL;
         }
         __sync_add_and_fetch(&ccxt->write_done_counter, 1);
 }
 
-static bool clientSendRequest(Client* obj, Request* req, ClientSendCallback callback, void *arg, bool *free_req) {
-        ClientPrivate *priv_p = obj->p;
+static bool clientSendRequest(Client* this, Request* req, ClientSendCallback callback, void *arg, bool *free_req) {
+        ClientPrivate *priv_p = this->p;
         Connection *conn = priv_p->conn;
         if (conn == NULL) {
                 return false;
@@ -295,7 +297,7 @@ static bool clientSendRequest(Client* obj, Request* req, ClientSendCallback call
         send_arg->sequence = req->sequence;
         send_arg->decoder = decoder;
 
-        bool rc = encoder(req, &send_arg->buffer, &send_arg->buffer_len, free_req);
+        bool rc = encoder(req, &send_arg->wbuf, &send_arg->wbuf_len, free_req);
         if (rc == false) {
                 *free_req = true;
                 free(send_arg);
@@ -310,7 +312,7 @@ static bool clientSendRequest(Client* obj, Request* req, ClientSendCallback call
         pthread_mutex_unlock(lock);
         __sync_add_and_fetch(&ccxt->write_counter, 1);
 
-        rc = conn->m->write(conn, send_arg->buffer, send_arg->buffer_len, clientWriteCallback, send_arg);
+        rc = conn->m->write(conn, send_arg->wbuf, send_arg->wbuf_len, clientWriteCallback, send_arg);
         if (rc) {
                 __sync_add_and_fetch(&ccxt->write_done_counter, 1);
                 pthread_mutex_lock(lock);
@@ -318,7 +320,7 @@ static bool clientSendRequest(Client* obj, Request* req, ClientSendCallback call
                 pthread_mutex_unlock(lock);
 
                 if (*free_req) {
-                        free(send_arg->buffer);
+                        free(send_arg->wbuf);
                 }
                 *free_req = true;
                 free(send_arg);
@@ -326,8 +328,8 @@ static bool clientSendRequest(Client* obj, Request* req, ClientSendCallback call
         return rc;
 }
 
-static void destroy(Client* obj) {
-        ClientPrivate *priv_p = obj->p;
+static void destroy(Client* this) {
+        ClientPrivate *priv_p = this->p;
         int i;
 
         for (i = 0; i < CLIENT_WAITING_HASH_LEN; i++) {
@@ -345,14 +347,14 @@ static ClientMethod method = {
         .destroy = destroy,
 };
 
-bool initClient(Client* obj, ClientParam* param) {
+bool initClient(Client* this, ClientParam* param) {
         ClientPrivate *priv_p = malloc(sizeof(*priv_p));
         ListHead *wlist;
         pthread_mutex_t *lock;
         int i, rc;
 
-        obj->p = priv_p;
-        obj->m = &method;
+        this->p = priv_p;
+        this->m = &method;
         memcpy(&priv_p->param, param, sizeof(*param));
         priv_p->conn = NULL;
         sem_init(&priv_p->sem, 0, 0);
@@ -372,7 +374,7 @@ bool initClient(Client* obj, ClientParam* param) {
         sparam.super.type = SOCKET_TYPE_CLIENT;
         sparam.read_tp = param->read_tp;
         sparam.write_tp = param->write_tp;
-        sparam.super.context = obj;
+        sparam.super.context = this;
         rc = initSocketLinux(&priv_p->socket, &sparam);
         if (rc == false) {
                 free(priv_p);

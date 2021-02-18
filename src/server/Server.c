@@ -228,8 +228,8 @@ static ServerContext* getContext(Server *srv) {
         return &priv_p->context;
 }
 
-static void destroy(Server* obj) {
-        ServerPrivate *priv_p = obj->p;
+static void destroy(Server* this) {
+        ServerPrivate *priv_p = this->p;
         
         priv_p->socket.m->destroy(&priv_p->socket);
         priv_p->tp_read.m->destroy(&priv_p->tp_read);
@@ -243,12 +243,12 @@ static ServerMethod method = {
         .destroy = destroy,
 };
 
-bool initServer(Server* obj, ServerParam* param) {
+bool initServer(Server* this, ServerParam* param) {
         ServerPrivate *priv_p = malloc(sizeof(*priv_p));
         bool rc;
 
-        obj->p = priv_p;
-        obj->m = &method;
+        this->p = priv_p;
+        this->m = &method;
         memcpy(&priv_p->param, param, sizeof(*param));
 
         ThreadPoolParam param_tp;
@@ -270,7 +270,7 @@ bool initServer(Server* obj, ServerParam* param) {
         linux_param.super.onConnect = serverOnConnect;
         linux_param.super.port = param->port;
         linux_param.super.type = SOCKET_TYPE_SERVER;
-        linux_param.super.context = obj;
+        linux_param.super.context = this;
         linux_param.read_tp = &priv_p->tp_read;
         linux_param.write_tp = &priv_p->tp_write;
 

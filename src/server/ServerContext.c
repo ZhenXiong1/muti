@@ -11,22 +11,22 @@
 
 #include <server/ServerContext.h>
 
-static void destroy(ServerContext* obj) {
-        obj->sampleDao.m->destroy(&obj->sampleDao);
+static void destroy(ServerContext* this) {
+        this->sampleDao.m->destroy(&this->sampleDao);
 }
 
 static ServerContextMethod method = {
         .destroy = destroy,
 };
 
-bool initServerContext(ServerContext* obj, ServerContextParam* param) {
+bool initServerContext(ServerContext* this, ServerContextParam* param) {
         SampleDaoParam sd_param;
         int rc;
 
-        obj->p = NULL;
-        obj->m = &method;
+        this->p = NULL;
+        this->m = &method;
         
-        rc = initSampleDao(&obj->sampleDao, &sd_param);
+        rc = initSampleDao(&this->sampleDao, &sd_param);
         if (rc == false) {
                 goto out;
         }

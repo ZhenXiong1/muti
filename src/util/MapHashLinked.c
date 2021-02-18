@@ -25,18 +25,18 @@ typedef struct MapHashLinkedItem {
 
 } MapHashLinkedItem;
 
-static size_t size(Map *map) {
-        MapHashLinkedPrivate *priv = map->p;
+static size_t size(Map *this) {
+        MapHashLinkedPrivate *priv = this->p;
         return priv->size;
 }
 
-static bool isEmpty(Map *map) {
-        MapHashLinkedPrivate *priv = map->p;
+static bool isEmpty(Map *this) {
+        MapHashLinkedPrivate *priv = this->p;
         return priv->size == 0;
 }
 
-static void* get(Map *map, void *key) {
-        MapHashLinkedPrivate *priv = map->p;
+static void* get(Map *this, void *key) {
+        MapHashLinkedPrivate *priv = this->p;
         uint64_t hash = priv->param.hashMethod(key);
         ListHead *slot = &priv->slots[hash & (priv->param.slot_size - 1)];
         MapHashLinkedItem *item;
@@ -50,8 +50,8 @@ static void* get(Map *map, void *key) {
         return NULL;
 }
 
-static void* put(Map *map, void *key, void *value) {
-        MapHashLinkedPrivate *priv = map->p;
+static void* put(Map *this, void *key, void *value) {
+        MapHashLinkedPrivate *priv = this->p;
         uint64_t hash = priv->param.hashMethod(key);
         ListHead *slot = &priv->slots[hash & (priv->param.slot_size - 1)];
         void *key1 = ((char *)value) + priv->param.keyOffsetInValue;
@@ -83,8 +83,8 @@ static void* put(Map *map, void *key, void *value) {
         return ret_value;
 }
 
-static void* _remove(Map *map, void *key) {
-        MapHashLinkedPrivate *priv = map->p;
+static void* _remove(Map *this, void *key) {
+        MapHashLinkedPrivate *priv = this->p;
         uint64_t hash = priv->param.hashMethod(key);
         ListHead *slot = &priv->slots[hash & (priv->param.slot_size - 1)];
         MapHashLinkedItem *item;
@@ -108,8 +108,8 @@ static void* _remove(Map *map, void *key) {
         return ret_value;
 }
 
-static void clear(Map *map, void** values) {
-        MapHashLinkedPrivate *priv = map->p;
+static void clear(Map *this, void** values) {
+        MapHashLinkedPrivate *priv = this->p;
         MapHashLinkedItem *item, *item1;
         ListHead *slot;
         uint64_t i, j;
@@ -126,8 +126,8 @@ static void clear(Map *map, void** values) {
         priv->size = 0;
 }
 
-static void destroy(Map* map) {
-        MapHashLinkedPrivate *priv = map->p;
+static void destroy(Map* this) {
+        MapHashLinkedPrivate *priv = this->p;
 
         free(priv->slots);
         free(priv);
@@ -143,7 +143,7 @@ static MapMethod method = {
         .clear = clear,
 };
 
-bool initMapHashLinked(Map* obj, MapHashLinkedParam* param) {
+bool initMapHashLinked(Map* this, MapHashLinkedParam* param) {
         MapHashLinkedPrivate *priv = malloc(sizeof(*priv));
         int i;
 
@@ -152,8 +152,8 @@ bool initMapHashLinked(Map* obj, MapHashLinkedParam* param) {
                 printf("Slot size must be 2^n\n");
                 exit(-1);
         }
-        obj->p = priv;
-        obj->m = &method;
+        this->p = priv;
+        this->m = &method;
         memcpy(&priv->param, param, sizeof(*param));
         priv->slots = malloc(sizeof(ListHead) * param->slot_size);
         for (i = 0; i < param->slot_size; i++) {
