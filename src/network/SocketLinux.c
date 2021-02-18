@@ -116,7 +116,7 @@ static void socketPostIOJobs(ConnectionLinux *conn_p, SocketPrivate *priv_p) {
         ListHead head;
         IOContext *ioctx, *ioctx1;
 
-        usleep(1000);
+        sleep(1);
         listHeadInit(&head);
         pthread_spin_lock(&conn_p->read_jobs_head_lck);
         listJoinTailInit(&conn_p->read_jobs_head, &head);

@@ -9,10 +9,6 @@
 #include <client/sender/SampleRequestSender.h>
 #include <stdbool.h>
 #include <res/Sample.h>
-#include <server/Server.h>
-#include <server/ServerContext.h>
-#include <network/Connection.h>
-#include <network/Socket.h>
 
 RequestEncoder SampleRequestEncoder[] = {
                 SampleRequestEncoderGet,
@@ -20,25 +16,27 @@ RequestEncoder SampleRequestEncoder[] = {
                 SampleRequestEncoderList,
 };
 
-bool SampleRequestEncoderGet(Request *req, char **buffer, size_t *buff_len, bool *free_resp) {
-        *buffer = (char*)req;
-        *buff_len = sizeof(SampleGetRequest);
-        *free_resp = false;
+bool SampleRequestEncoderGet(Request *req, char **buffer, size_t *buff_len, bool *free_req) {
+	SampleGetRequest *req1 = (SampleGetRequest*)req;
+	*buffer = (char*) req1;
+	*buff_len = sizeof(*req1);
+	*free_req = false;
         return true;
 }
 
-bool SampleRequestEncoderPut(Request *req, char **buffer, size_t *buff_len, bool *free_resp) {
-        *buffer = (char*)req;
-        SamplePutRequest *get_req = (SamplePutRequest*)req;
-        *buff_len = sizeof(SamplePutRequest) + get_req->sample.path_length;
-        *free_resp = false;
+bool SampleRequestEncoderPut(Request *req, char **buffer, size_t *buff_len, bool *free_req) {
+	SamplePutRequest *req1 = (SamplePutRequest*)req;
+	*buffer = (char*) req1;
+	*buff_len = sizeof(*req1);
+	*free_req = false;
         return true;
 }
 
-bool SampleRequestEncoderList(Request *req, char **buffer, size_t *buff_len, bool *free_resp) {
-        *buffer = (char*)req;
-        *buff_len = sizeof(SampleListRequest);
-        *free_resp = false;
+bool SampleRequestEncoderList(Request *req, char **buffer, size_t *buff_len, bool *free_req) {
+	SampleListRequest *req1 = (SampleListRequest*)req;
+	*buffer = (char*) req1;
+	*buff_len = sizeof(*req1);
+	*free_req = false;
         return true;
 }
 
@@ -48,56 +46,58 @@ ResponseDecoder SampleResponseDecoder[] = {
                 SampleResponseDecoderList,
 };
 
-Response* SampleResponseDecoderGet(char *buffer, size_t buff_len, size_t *consume_len, bool *free_req) {
-        size_t req_len;
-        SampleGetResponse *req = (SampleGetResponse*)buffer;
-        req_len = sizeof(SampleGetResponse) + req->sample.path_length;
-        if (buff_len < req_len) return NULL;
-        *consume_len = req_len;
-        *free_req = false;
-        return &req->super;
+Response* SampleResponseDecoderGet(char *buffer, size_t buff_len, size_t *consume_len, bool *free_resp) {
+	SampleGetResponse *resp = (SampleGetResponse*)buffer;
+	size_t len = sizeof(*resp);
+	if (buff_len < len) return NULL;
+	len += resp->sample.path_length;
+	if (buff_len < len) return NULL;
+	*consume_len = len;
+	*free_resp = false;
+	return &resp->super;
 }
 
-Response* SampleResponseDecoderPut(char *buffer, size_t buff_len, size_t *consume_len, bool *free_req) {
-        size_t req_len;
-        SamplePutResponse *req = (SamplePutResponse*)buffer;
-        req_len = sizeof(SamplePutResponse);
-        if (buff_len < req_len) return NULL;
-        *consume_len = req_len;
-        *free_req = false;
-        return &req->super;
+Response* SampleResponseDecoderPut(char *buffer, size_t buff_len, size_t *consume_len, bool *free_resp) {
+	SamplePutResponse *resp = (SamplePutResponse*)buffer;
+	size_t len = sizeof(*resp);
+	if (buff_len < len) return NULL;
+	*consume_len = len;
+	*free_resp = false;
+        return &resp->super;
 }
 
-Response* SampleResponseDecoderList(char *buffer, size_t buff_len, size_t *consume_len, bool *free_req) {
-        SampleListResponse *list_resp = malloc(sizeof(SampleListResponse));
-        size_t clen = 0;
+Response* SampleResponseDecoderList(char *buffer, size_t buff_len, size_t *consume_len, bool *free_resp) {
+	SampleListResponse *resp = malloc(sizeof(*resp));
+	listHeadInit(&resp->sample_head);
 
-        clen += 1; if (buff_len < clen) { free(list_resp); return NULL;}
-        list_resp->super.error_id = *(int8_t*)buffer;
-        buffer += 1;
+	size_t len = 0;
+	len += 1; if (buff_len < len) goto err_out;
+	resp->super.error_id = *(int8_t*)buffer;
+	buffer += 1;
 
-        clen += 4; if (buff_len < clen) { free(list_resp); return NULL;}
-        list_resp->super.sequence = *(uint32_t*)buffer;
-        buffer += 4;
+	len += 4; if (buff_len < len) goto err_out;
+	resp->super.sequence = *(uint32_t*)buffer;
+	buffer += 4;
 
-        clen += 4; if (buff_len < clen) { free(list_resp); return NULL;}
-        list_resp->length = *(uint32_t*)buffer;
-        buffer += 4;
+	len += 4; if (buff_len < len) goto err_out;
+	resp->length = *(uint32_t*)buffer;
+	buffer += 4;
 
-        int i;
-        ListHead *head = list_resp->sample_list;
-        listHeadInit(head);
-        for (i = 0; i < list_resp->length; i++) {
-                Sample *s = buffer;
-                size_t blen = sizeof(*s) + s->path_length;
-                clen += blen; if (buff_len < clen) { free(list_resp); return NULL;}
-                buffer += blen;
-                listAddTail(&s->element, head);
-        }
-        *consume_len = clen;
-        *free_req = true;
-        return &list_resp->super;
+	int i;
+	for (i = 0; i < resp->length; i++) {
+		len += sizeof(Sample);
+		if (buff_len < len) goto err_out;
+		Sample *s = (Sample*)buffer;
+		len += s->path_length;
+		if (buff_len < len) goto err_out;
+		buffer += sizeof(Sample) + s->path_length;
+		listAddTail(&s->element, &resp->sample_head);
+	}
+	*consume_len = len;
+	*free_resp = true;
+        return &resp->super;
+err_out:
+	free(resp);
+	return NULL;
 }
-
-
 
