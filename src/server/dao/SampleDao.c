@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
+#include <pthread.h>
 
 #include <server/dao/SampleDao.h>
 #include <util/Map.h>
@@ -18,18 +20,26 @@ typedef struct SampleDaoPrivate {
         Map                     map;
         ListHead                list;
         int                     list_size;
+        pthread_mutex_t         lock;
 } SampleDaoPrivate;
 
 static Sample* getSample(SampleDao* this, int id) {
         SampleDaoPrivate *priv_p = this->p;
         Map *map = &priv_p->map;
-        return map->m->get(map, &id);
+        Sample* s;
+        pthread_mutex_lock(&priv_p->lock);
+        s = map->m->get(map, &id);
+        pthread_mutex_unlock(&priv_p->lock);
+        return s;
 }
 
 static int putSample(SampleDao* this, Sample *sample) {
         SampleDaoPrivate *priv_p = this->p;
         Map *map = &priv_p->map;
-        Sample *s = map->m->get(map, &sample->id);
+        Sample *s;
+
+        pthread_mutex_lock(&priv_p->lock);
+        s = map->m->get(map, &sample->id);
         if (s == NULL) {
                 s = malloc(sizeof(*s) + sample->path_length);
                 memcpy(s, sample, sizeof(*s) + sample->path_length);
@@ -41,6 +51,7 @@ static int putSample(SampleDao* this, Sample *sample) {
                 memcpy(s, sample, sizeof(*s) + sample->path_length);
                 DLOG("Replace old sample, id:%d", s->id);
         }
+        pthread_mutex_unlock(&priv_p->lock);
         return 0;
 }
 
@@ -53,6 +64,7 @@ static int listSample(SampleDao* this, ListHead **head, int page, int page_size)
         Sample *s;
 
         if (offset >= priv_p->list_size) return 0;
+        pthread_mutex_lock(&priv_p->lock);
         int left = priv_p->list_size - offset;
         listForEachEntry(s, &priv_p->list, element) {
                 if (offset == off) {
@@ -61,6 +73,7 @@ static int listSample(SampleDao* this, ListHead **head, int page, int page_size)
                 off++;
         }
         *head = &s->element;
+        pthread_mutex_unlock(&priv_p->lock);
         return min(left, page_size);
 }
 
@@ -71,6 +84,8 @@ static void destroy(SampleDao* this) {
         int i;
 
         if (priv_p->list_size) {
+        	pthread_mutex_lock(&priv_p->lock);
+                assert(map->m->size(map) == priv_p->list_size);
                 values = malloc(sizeof(void*) * priv_p->list_size);
                 listHeadInit(&priv_p->list);
                 map->m->clear(map, (void **)values);
@@ -78,6 +93,7 @@ static void destroy(SampleDao* this) {
                         free(values[i]);
                 }
                 free(values);
+                pthread_mutex_unlock(&priv_p->lock);
         }
         map->m->destroy(map);
 
@@ -110,6 +126,7 @@ bool initSampleDao(SampleDao* this, SampleDaoParam* param) {
 
         listHeadInit(&priv_p->list);
         priv_p->list_size = 0;
+        pthread_mutex_init(&priv_p->lock, NULL);
 
         map_param.super.compareMethod = SampleCompareMethod;
         map_param.hashMethod = SampleHashMethod;

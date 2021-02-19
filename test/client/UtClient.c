@@ -22,8 +22,8 @@ void UtClientSamplePutSendCallback(Client *client, Response *resp, void *arg) {
         if (resp->error_id) {
                 ELOG("Send request failed.");
         }
-        sem_t *sem = arg;
-        sem_post(sem);
+        volatile int *done_number = arg;
+        __sync_add_and_fetch(done_number, 1);
 }
 
 int UtClient(int argv, char **argvs) {
@@ -55,32 +55,37 @@ int UtClient(int argv, char **argvs) {
         rc = initClient(&client, &param);
         assert(rc == true);
 
-        SamplePutRequest *sput = malloc(sizeof(*sput) + 1024);
-        Sample *s1 = &sput->sample;
-        strcpy(s1->bucket, "buck1");
-        s1->id = 1000;
-        s1->path = s1->data;
-        strcpy(s1->path, "/var/log/message");
-        s1->path_length = strlen(s1->path);
-        s1->size = 1 << 30;
+        int round;
+        volatile int done_number = 0;
+        for (round = 0; round < 1000000; round++) {
+                SamplePutRequest *sput = calloc(1, sizeof(*sput) + 1024);
+                Sample *s1 = &sput->sample;
+                strcpy(s1->bucket, "buck1");
+                s1->id = round;
+                s1->path = s1->data;
+                sprintf(s1->path, "/var/log/message%dxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", round);
+                s1->path_length = strlen(s1->path);
+                s1->size = 1 << 30;
 
-        Request *req = &sput->super;
-        req->request_id = SampleRequestIdPut;
-        req->resource_id = ResourceIdSample;
+                Request *req = &sput->super;
+                req->request_id = SampleRequestIdPut;
+                req->resource_id = ResourceIdSample;
 
-        sem_t sem;
-        sem_init(&sem, 0, 0);
-        bool free_req;
+                bool free_req;
 
-        rc = client.m->sendRequest(&client, &sput->super, UtClientSamplePutSendCallback, &sem, &free_req);
-        if (free_req) {
-                free(sput);
+                rc = client.m->sendRequest(&client, &sput->super, UtClientSamplePutSendCallback, (void*)&done_number, &free_req);
+                if (free_req) {
+                        free(sput);
+                }
+                if (rc) {
+                        DLOG("Put success!!");
+                } else {
+                        __sync_add_and_fetch(&done_number, 1);
+                        DLOG("Send request failed!!");
+                }
         }
-        if (rc) {
-                sem_wait(&sem);
-                DLOG("Put success!!");
-        } else {
-                DLOG("Send request failed!!");
+        while (done_number < 10000) {
+                sleep(1);
         }
         client.m->destroy(&client);
         read_tp.m->destroy(&read_tp);

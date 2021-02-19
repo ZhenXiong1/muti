@@ -27,7 +27,7 @@ int UtServer(int argv, char **argvs) {
         bool rc = initThreadPool(&work_tp, &param_tp);
         assert(rc == true);
         param.port = 10809;
-        param.read_buffer_size = 1 << 20;
+        param.read_buffer_size = 1 << 11;
         param.request_handler = ServerRequestHandlers;
         param.request_handler_length = sizeof(ServerRequestHandlers);
         DLOG("param.request_handler_length:%u", param.request_handler_length);

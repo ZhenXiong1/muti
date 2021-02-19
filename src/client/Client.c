@@ -42,6 +42,8 @@ typedef struct ClientSendArg {
                 ListElement     element;
                 Job             job;
         };
+        volatile int            ref;
+
         Readbuffer              *rbuf;
         Response                *response;
         bool                    free_resp;
@@ -145,7 +147,10 @@ static void clientDoJob(Job *job) {
         if (send_arg->free_resp) {
                 free(send_arg->response);
         }
-        free(send_arg);
+        left = __sync_sub_and_fetch(&send_arg->ref, 1);
+        if (left == 0) {
+                free(send_arg);
+        }
 }
 
 static void clientReadCallback(Connection* conn_p, bool rc, void* buffer, size_t sz, void *cbarg) {
@@ -274,6 +279,10 @@ static void clientWriteCallback(Connection *conn, bool rc, void *cbarg) {
                 DLOG("Client write success\n");
                 free(send_arg->wbuf);
                 send_arg->wbuf = NULL;
+                int left = __sync_sub_and_fetch(&send_arg->ref, 1);
+                if (left == 0) {
+                        free(send_arg);
+                }
         }
         __sync_add_and_fetch(&ccxt->write_done_counter, 1);
 }
@@ -282,6 +291,7 @@ static bool clientSendRequest(Client* this, Request* req, ClientSendCallback cal
         ClientPrivate *priv_p = this->p;
         Connection *conn_p = priv_p->conn;
         if (conn_p == NULL) {
+                *free_req = true;
                 return false;
         }
 
@@ -291,6 +301,7 @@ static bool clientSendRequest(Client* this, Request* req, ClientSendCallback cal
         ClientSendArg *send_arg = malloc(sizeof(*send_arg));
 
         send_arg->callback = callback;
+        send_arg->ref = 2;
         send_arg->arg = arg;
         req->sequence = __sync_add_and_fetch(&priv_p->sequence, 1);
         send_arg->sequence = req->sequence;
