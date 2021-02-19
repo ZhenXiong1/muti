@@ -19,7 +19,9 @@
 #include <res/Sample.h>
 
 void UtClientSamplePutSendCallback(Client *client, Response *resp, void *arg) {
-        assert(resp->error_id == 0);
+        if (resp->error_id) {
+                ELOG("Send request failed.");
+        }
         sem_t *sem = arg;
         sem_post(sem);
 }
@@ -70,12 +72,16 @@ int UtClient(int argv, char **argvs) {
         sem_init(&sem, 0, 0);
         bool free_req;
 
-        client.m->sendRequest(&client, &sput->super, UtClientSamplePutSendCallback, &sem, &free_req);
+        rc = client.m->sendRequest(&client, &sput->super, UtClientSamplePutSendCallback, &sem, &free_req);
         if (free_req) {
                 free(sput);
         }
-        sem_wait(&sem);
-        DLOG("Put success!!");
+        if (rc) {
+                sem_wait(&sem);
+                DLOG("Put success!!");
+        } else {
+                DLOG("Send request failed!!");
+        }
         client.m->destroy(&client);
         read_tp.m->destroy(&read_tp);
         write_tp.m->destroy(&write_tp);

@@ -267,7 +267,7 @@ static void clientWriteCallback(Connection *conn, bool rc, void *cbarg) {
 
                 Response resp;
                 resp.error_id = -3;
-                send_arg->callback(this, &resp, cbarg);
+                send_arg->callback(this, &resp, send_arg->arg);
                 free(send_arg->wbuf);
                 free(send_arg);
         } else {

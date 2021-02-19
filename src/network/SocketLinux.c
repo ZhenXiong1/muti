@@ -59,8 +59,8 @@ bool initSocketLinux(Socket* obj, SocketLinuxParam* param) {
 #include "ConnectionLinux.h"
 #include "Log.h"
 
-#define DLOG_SOCKET(str, args...) DLOG(str, ##args)
-//#define DLOG_SOCKET(str, args...)
+//#define DLOG_SOCKET(str, args...) DLOG(str, ##args)
+#define DLOG_SOCKET(str, args...)
 
 #define MAXEVENTS 128
 
@@ -85,6 +85,7 @@ static inline void socketIODone(SocketPrivate *priv_p, ConnectionLinux *conn_p, 
                 pthread_spin_lock(&priv_p->conn_lock);
                 listDel(&conn_p->element);
                 pthread_spin_unlock(&priv_p->conn_lock);
+                close(conn_p->fd);
                 ((ConnectionLinuxMethod*)conn_p->super.m)->destroy(&conn_p->super);
                 free(conn_p);
         }
@@ -428,8 +429,8 @@ static void * socketEpollWaitingThread(void *p) {
                                         continue;
                                 }
                                 conn_p = events[i].data.ptr;
-                                ELOG("Server:Epoll error, tid:%x, fd:%d, i:%d, event:%x (%p)\n", pthread_self(), events[i].data.fd, i, events[i].events, conn_p);
-//                                epoll_ctl(priv_p->efd, EPOLL_CTL_DEL,  events[i].data.fd, &event);
+                                ELOG("Server:Epoll error, tid:%lu, fd:%d, i:%d, event:%x (%p)\n", pthread_self(), events[i].data.fd, i, events[i].events, conn_p);
+                                epoll_ctl(priv_p->efd, EPOLL_CTL_DEL,  events[i].data.fd, &event);
 
                                 pthread_t tid;
                                 pthread_attr_t attr;
@@ -806,7 +807,8 @@ static void destroy(Socket* obj) {
 	}
         pthread_spin_lock(&priv_p->conn_lock);
         listForEachEntrySafe(conn_p, conn_p1, &priv_p->conn_head, element) {
-                shutdown(conn_p->fd, SHUT_RDWR);
+                conn_p->super.m->close(&conn_p->super);
+//                shutdown(conn_p->fd, SHUT_RDWR);
         }
         while (!listEmpty(&priv_p->conn_head)) {
                 pthread_spin_unlock(&priv_p->conn_lock);

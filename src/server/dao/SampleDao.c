@@ -67,15 +67,20 @@ static int listSample(SampleDao* this, ListHead **head, int page, int page_size)
 static void destroy(SampleDao* this) {
         SampleDaoPrivate *priv_p = this->p;
         Map *map = &priv_p->map;
-        Sample **values = malloc(sizeof(void*) * priv_p->list_size);
+        Sample **values;
         int i;
 
-        listHeadInit(&priv_p->list);
-        map->m->clear(map, (void **)values);
-        for (i = 0; i < priv_p->list_size; i++) {
-                free(values[i]);
+        if (priv_p->list_size) {
+                values = malloc(sizeof(void*) * priv_p->list_size);
+                listHeadInit(&priv_p->list);
+                map->m->clear(map, (void **)values);
+                for (i = 0; i < priv_p->list_size; i++) {
+                        free(values[i]);
+                }
+                free(values);
         }
         map->m->destroy(map);
+
         free(priv_p);
 }
 
@@ -104,6 +109,7 @@ bool initSampleDao(SampleDao* this, SampleDaoParam* param) {
         memcpy(&priv_p->param, param, sizeof(*param));
 
         listHeadInit(&priv_p->list);
+        priv_p->list_size = 0;
 
         map_param.super.compareMethod = SampleCompareMethod;
         map_param.hashMethod = SampleHashMethod;
