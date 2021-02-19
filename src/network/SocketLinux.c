@@ -59,8 +59,8 @@ bool initSocketLinux(Socket* obj, SocketLinuxParam* param) {
 #include "ConnectionLinux.h"
 #include "Log.h"
 
-//#define DLOG_SOCKET(str, args...) DLOG(str, ##args)
-#define DLOG_SOCKET(str, args...)
+#define DLOG_SOCKET(str, args...) DLOG(str, ##args)
+//#define DLOG_SOCKET(str, args...)
 
 #define MAXEVENTS 128
 
@@ -180,7 +180,7 @@ static ssize_t socketNoneBlockRead(int sfd, void *buf, size_t len) {
         while (to_read) {
                 n = read(sfd, p, to_read);
                 if (n == 0) {
-                        if (nread == 0) nread = -1; // the other side closed, return -1 to let the caller know the error
+                        nread = -1; // the other side closed, return -1 to let the caller know the error
                         break;
                 }
                 if (n == -1) {
@@ -189,7 +189,7 @@ static ssize_t socketNoneBlockRead(int sfd, void *buf, size_t len) {
                         else if (errno == EAGAIN || errno == EWOULDBLOCK)
                                 break; // EAGAIN/EWOULDBLOCK, return >=0 to let the caller treat it as success
 
-                        if (nread == 0) nread = -1;
+                        nread = -1;
                         break;
                 }
                 nread += n;
@@ -219,6 +219,7 @@ static void socketDoRead(Job *job) {
         listForEachEntrySafe(ioctx, ioctx1, &read_head, element) {
                 ssize_t nread = socketNoneBlockRead(conn_p->fd, ioctx->buf, ioctx->buf_size);
                 if (nread == -1) {
+                	conn_p->super.m->close(&conn_p->super);
                         goto closed;
                 } else if (nread == 0) {
                         break;
@@ -259,7 +260,7 @@ static ssize_t socketNoneBlockWrite(int sfd, void *buf, size_t len) {
         while (to_write) {
                 n = write(sfd, p, to_write);
                 if (n == 0) {
-                        if (nwrite == 0) nwrite = -1; // the other side closed, return -1 to let the caller know the error
+                        nwrite = -1; // the other side closed, return -1 to let the caller know the error
                         break;
                 }
                 if (n == -1) {
@@ -268,7 +269,7 @@ static ssize_t socketNoneBlockWrite(int sfd, void *buf, size_t len) {
                         else if (errno == EAGAIN || errno == EWOULDBLOCK)
                                 break; // EAGAIN/EWOULDBLOCK, return >=0 to let the caller treat it as success
 
-                        if (nwrite == 0) nwrite = -1;
+                        nwrite = -1;
                         break;
                 }
                 nwrite += n;
@@ -298,6 +299,7 @@ static void socketDoWrite(Job *job) {
         listForEachEntrySafe(ioctx, ioctx1, &write_head, element) {
                 ssize_t nwrite = socketNoneBlockWrite(conn_p->fd, ioctx->buf, ioctx->buf_size);
                 if (nwrite == -1) {
+                	//conn_p->super.m->close(&conn_p->super);
                         goto closed;
                 } else if (nwrite == 0) {
                         break;
@@ -426,8 +428,8 @@ static void * socketEpollWaitingThread(void *p) {
                                         continue;
                                 }
                                 conn_p = events[i].data.ptr;
-                                ELOG("Server:Epoll error, event:%x (%p)\n", events[i].events, conn_p);
-                                epoll_ctl(priv_p->efd, EPOLL_CTL_DEL,  events[i].data.fd, &event);
+                                ELOG("Server:Epoll error, tid:%x, fd:%d, i:%d, event:%x (%p)\n", pthread_self(), events[i].data.fd, i, events[i].events, conn_p);
+//                                epoll_ctl(priv_p->efd, EPOLL_CTL_DEL,  events[i].data.fd, &event);
 
                                 pthread_t tid;
                                 pthread_attr_t attr;

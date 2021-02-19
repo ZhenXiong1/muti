@@ -14,6 +14,7 @@
 #include <server/ServerContext.h>
 #include <network/Connection.h>
 #include <network/Socket.h>
+#include <Log.h>
 
 Action SampleActions[] = {
         SampleActionGet,
@@ -31,11 +32,11 @@ void SampleActionGet(SRequest *req) {
         Sample* sample = sdao->m->getSample(sdao, request->id);
         Response *resp;
         if (sample == NULL) {
-                resp = malloc(sizeof(*resp));
+                resp = calloc(1, sizeof(*resp));
                 resp->sequence = request->super.sequence;
                 resp->error_id = 1;
         } else {
-                SampleGetResponse *resp1 = malloc(sizeof(*resp) + sample->path_length);
+                SampleGetResponse *resp1 = calloc(1, sizeof(*resp1) + sample->path_length);
                 resp = &resp1->super;
                 resp->sequence = request->super.sequence;
                 resp->error_id = 0;
@@ -54,7 +55,7 @@ void SampleActionPut(SRequest *req) {
         Sample* sample = &request->sample;
         Response *resp;
 
-        resp = malloc(sizeof(*resp));
+        resp = calloc(1, sizeof(*resp));
         resp->sequence = request->super.sequence;
         resp->error_id = (int8_t)sdao->m->putSample(sdao, sample);
 
@@ -133,6 +134,7 @@ bool SampleResponseEncoderGet(Response *resp, char **buffer, size_t *buff_len, b
 bool SampleResponseEncoderPut(Response *resp, char **buffer, size_t *buff_len, bool *free_resp) {
         *buffer = (char*)resp;
         *buff_len = sizeof(SamplePutResponse);
+        DLOG("buffer_len:%lu", *buff_len);
         *free_resp = false;
         return true;
 }

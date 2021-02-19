@@ -36,7 +36,7 @@ int UtServer(int argv, char **argvs) {
 
         rc = initServer(&server, &param);
         assert(rc == true);
-        sleep(1000);
+        sleep(100);
         DLOG("Exiting...");
         server.m->destroy(&server);
         work_tp.m->destroy(&work_tp);

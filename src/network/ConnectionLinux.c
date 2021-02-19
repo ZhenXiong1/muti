@@ -106,12 +106,13 @@ static bool connWrite(Connection* conn_p, void* buf, size_t sz, ConnectionWriteC
         return true;
 }
 
-//void socketCloseConnection(ConnectionLinux *conn_p);
-
 static void connClose(Connection *conn_p) {
-        ConnectionLinux *conn_lp = containerOf(conn_p, ConnectionLinux, super);
-        shutdown(conn_lp->fd, SHUT_RDWR);
-//        socketCloseConnection(conn_lp);
+	ConnectionPrivate *priv_p = conn_p->p;
+        if (priv_p->param.fd != -1) {
+        	shutdown(priv_p->param.fd, SHUT_RDWR);
+        	close(priv_p->param.fd);
+        	priv_p->param.fd = -1;
+        }
 }
 
 static void destroy(Connection* conn_p) {
