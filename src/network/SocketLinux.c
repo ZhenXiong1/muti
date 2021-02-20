@@ -181,6 +181,7 @@ static ssize_t socketNoneBlockRead(int sfd, void *buf, size_t len) {
         while (to_read) {
                 n = read(sfd, p, to_read);
                 if (n == 0) {
+                	ELOG("read error 1: read 0 byte, remote close");
                         nread = -1; // the other side closed, return -1 to let the caller know the error
                         break;
                 }
@@ -189,7 +190,7 @@ static ssize_t socketNoneBlockRead(int sfd, void *buf, size_t len) {
                                 continue; // interrupted, read again
                         else if (errno == EAGAIN || errno == EWOULDBLOCK)
                                 break; // EAGAIN/EWOULDBLOCK, return >=0 to let the caller treat it as success
-
+                        ELOG("read error 2: read errno:%d", errno);
                         nread = -1;
                         break;
                 }
@@ -261,6 +262,7 @@ static ssize_t socketNoneBlockWrite(int sfd, void *buf, size_t len) {
         while (to_write) {
                 n = write(sfd, p, to_write);
                 if (n == 0) {
+                	ELOG("write error 1: write 0 byte, remote close");
                         nwrite = -1; // the other side closed, return -1 to let the caller know the error
                         break;
                 }
@@ -269,7 +271,7 @@ static ssize_t socketNoneBlockWrite(int sfd, void *buf, size_t len) {
                                 continue; // interrupted, read again
                         else if (errno == EAGAIN || errno == EWOULDBLOCK)
                                 break; // EAGAIN/EWOULDBLOCK, return >=0 to let the caller treat it as success
-
+                        ELOG("write error 2: write errno:%d", errno);
                         nwrite = -1;
                         break;
                 }

@@ -134,7 +134,6 @@ bool SampleResponseEncoderGet(Response *resp, char **buffer, size_t *buff_len, b
 bool SampleResponseEncoderPut(Response *resp, char **buffer, size_t *buff_len, bool *free_resp) {
         *buffer = (char*)resp;
         *buff_len = sizeof(SamplePutResponse);
-        DLOG("buffer_len:%lu", *buff_len);
         *free_resp = false;
         return true;
 }

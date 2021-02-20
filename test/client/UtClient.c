@@ -20,7 +20,7 @@
 
 void UtClientSamplePutSendCallback(Client *client, Response *resp, void *arg) {
         if (resp->error_id) {
-                ELOG("Send request failed.");
+//                ELOG("Send request failed.");
         }
         volatile int *done_number = arg;
         __sync_add_and_fetch(done_number, 1);
@@ -81,7 +81,10 @@ int UtClient(int argv, char **argvs) {
                         DLOG("Put success!!");
                 } else {
                         __sync_add_and_fetch(&done_number, 1);
-                        DLOG("Send request failed!!");
+//                        DLOG("Send request failed!!");
+                }
+                while (round - done_number > 10000) {
+                	usleep(1);
                 }
         }
         while (done_number < 10000) {
