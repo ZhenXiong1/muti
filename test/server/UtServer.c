@@ -33,6 +33,7 @@ int UtServer(int argv, char **argvs) {
         DLOG("param.request_handler_length:%u", param.request_handler_length);
         param.socket_io_thread_number = 6;
         param.worker_tp = &work_tp;
+        param.max_handle_request = 1000000;
 
         rc = initServer(&server, &param);
         assert(rc == true);

@@ -131,7 +131,7 @@ bool initSampleDao(SampleDao* this, SampleDaoParam* param) {
         map_param.super.compareMethod = SampleCompareMethod;
         map_param.hashMethod = SampleHashMethod;
         map_param.keyOffsetInValue = (uint64_t)&((Sample*)NULL)->id;
-        map_param.slot_size = 1 << 7;
+        map_param.slot_size = 1 << 20;
         rc = initMapHashLinked(&priv_p->map, &map_param);
         if (rc == false) {
                 free(priv_p);

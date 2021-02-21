@@ -10,6 +10,7 @@
 #include <string.h>
 #include <assert.h>
 #include <unistd.h>
+#include <pthread.h>
 
 #include <server/Server.h>
 #include <network/Socket.h>
@@ -29,8 +30,13 @@ typedef struct SConnectionContext {
         volatile uint64_t       read_done_counter;
         volatile uint64_t       write_counter;
         volatile uint64_t       write_done_counter;
+        volatile uint64_t       received_request_counter;
+        volatile uint64_t       sent_request_counter;
+        Readbuffer              *to_read_buf;
+        pthread_mutex_t         to_read_buf_lock;
 } SConnectionContext;
 
+static void serverReadCallback(Connection* conn_p, bool rc, void* buffer, size_t sz, void *cbarg);
 
 static Readbuffer* serverCreateReadBuffer(ServerPrivate *priv_p) {
         Readbuffer *rbuf = malloc(sizeof(*rbuf));
@@ -41,12 +47,40 @@ static Readbuffer* serverCreateReadBuffer(ServerPrivate *priv_p) {
         return rbuf;
 }
 
+static inline void serverWakeupRead(Connection *conn_p) {
+        Socket* skt = conn_p->m->getSocket(conn_p);
+        Server* srv = skt->m->getContext(skt);
+        ServerPrivate *priv_p = srv->p;
+        SConnectionContext *ccxt = conn_p->m->getContext(conn_p);
+
+        if (ccxt->to_read_buf && (int)(ccxt->received_request_counter - ccxt->sent_request_counter) < priv_p->param.max_handle_request) {
+                pthread_mutex_lock(&ccxt->to_read_buf_lock);
+                if (ccxt->to_read_buf) {
+                        Readbuffer *rbuf = ccxt->to_read_buf;
+                        DLOG("error:: resume rbuf:%p cnt:%lu max:%d", rbuf, ccxt->received_request_counter - ccxt->sent_request_counter, priv_p->param.max_handle_request);
+                        __sync_add_and_fetch(&ccxt->read_counter, 1);
+                        bool rc = conn_p->m->read(conn_p, rbuf->buffer + rbuf->read_buffer_start,
+                                        priv_p->param.read_buffer_size - rbuf->read_buffer_start,
+                                        serverReadCallback, rbuf);
+                        if (rc == false) {
+                                free(rbuf->buffer);
+                                free(rbuf);
+                                __sync_add_and_fetch(&ccxt->read_done_counter, 1);
+                        }
+                        ccxt->to_read_buf = NULL;
+                }
+                pthread_mutex_unlock(&ccxt->to_read_buf_lock);
+        }
+}
+
 static void serverWriteCallback(Connection* conn_p, bool rc, void *buffer) {
         SConnectionContext *ccxt = conn_p->m->getContext(conn_p);
         if (rc == false) {
                 ELOG("error send buffer!!");
         }
         __sync_add_and_fetch(&ccxt->write_done_counter, 1);
+        __sync_add_and_fetch(&ccxt->sent_request_counter, 1);
+        serverWakeupRead(conn_p);
         free(buffer);
 }
 
@@ -70,7 +104,9 @@ static void serverDoActionCallback(SRequest *reqw) {
         bool rc = conn_p->m->write(conn_p, buffer, buff_len, serverWriteCallback, buffer);
         if (rc == false) {
                 free(buffer);
+                __sync_add_and_fetch(&ccxt->sent_request_counter, 1);
                 __sync_add_and_fetch(&ccxt->write_done_counter, 1);
+                serverWakeupRead(conn_p);
         }
         if (free_resp) {
                 free(reqw->response);
@@ -94,18 +130,29 @@ static void serverDoAction(Job *job) {
         handler->actions[reqw->request->request_id](reqw);
 }
 
-static void serverReadCallback(Connection* conn_p, bool rc, void* buffer, size_t sz, void *cbarg);
-
 static inline void serverRead(Connection* conn_p, ServerPrivate *priv_p, char *buf, size_t buf_len) {
         SConnectionContext *ccxt = conn_p->m->getContext(conn_p);
         Readbuffer *rbuf = serverCreateReadBuffer(priv_p);
         memcpy(rbuf->buffer, buf, buf_len);
         rbuf->read_buffer_start = buf_len;
+
+        if (ccxt->received_request_counter - ccxt->sent_request_counter >= priv_p->param.max_handle_request) {
+                pthread_mutex_lock(&ccxt->to_read_buf_lock);
+                if (ccxt->received_request_counter - ccxt->sent_request_counter >= priv_p->param.max_handle_request) {
+                        assert(ccxt->to_read_buf == NULL);
+                        ccxt->to_read_buf = rbuf;
+                        // TODO replace this method
+                        DLOG("error:: temp hung rbuf:%p cnt:%lu max:%d", rbuf, ccxt->received_request_counter - ccxt->sent_request_counter, priv_p->param.max_handle_request);
+                }
+                pthread_mutex_unlock(&ccxt->to_read_buf_lock);
+                return;
+        }
+
         __sync_add_and_fetch(&ccxt->read_counter, 1);
-        bool rrc = conn_p->m->read(conn_p, rbuf->buffer + rbuf->read_buffer_start,
+        bool rc = conn_p->m->read(conn_p, rbuf->buffer + rbuf->read_buffer_start,
                         priv_p->param.read_buffer_size - rbuf->read_buffer_start,
                         serverReadCallback, rbuf);
-        if (rrc == false) {
+        if (rc == false) {
                 free(rbuf->buffer);
                 free(rbuf);
                 __sync_add_and_fetch(&ccxt->read_done_counter, 1);
@@ -179,7 +226,13 @@ static void serverReadCallback(Connection* conn_p, bool rc, void* buffer, size_t
                         buf_len -= consume_len;
                         __sync_add_and_fetch(&rbuf->reference, 1);
                         reqw->job.doJob = serverDoAction;
-                        priv_p->param.worker_tp->m->insertTail(priv_p->param.worker_tp, &reqw->job);
+                        __sync_add_and_fetch(&ccxt->received_request_counter, 1);
+                        rc = priv_p->param.worker_tp->m->insertTail(priv_p->param.worker_tp, &reqw->job);
+                        if (rc == false) {
+                                __sync_sub_and_fetch(&rbuf->reference, 1);
+                                __sync_add_and_fetch(&ccxt->sent_request_counter, 1);
+                                goto out;
+                        }
                 } else {
                         serverRead(conn_p, priv_p, buf, buf_len);
                         break;
@@ -200,6 +253,7 @@ static void serverOnConnect(Connection *conn) {
         Server* srv = skt->m->getContext(skt);
         ServerPrivate *priv_p = srv->p;
         SConnectionContext *ccxt = calloc(1, sizeof(SConnectionContext));
+        pthread_mutex_init(&ccxt->to_read_buf_lock, NULL);
         Readbuffer *rbuf = serverCreateReadBuffer(priv_p);
 
         conn->m->setContext(conn, ccxt);
@@ -212,6 +266,16 @@ static void serverOnConnect(Connection *conn) {
 static void serverOnClose(Connection *conn) {
         SConnectionContext *ccxt;
         ccxt = conn->m->getContext(conn);
+
+        pthread_mutex_lock(&ccxt->to_read_buf_lock);
+        if (ccxt->to_read_buf) {
+                free(ccxt->to_read_buf->buffer);
+                free(ccxt->to_read_buf);
+                ccxt->to_read_buf = NULL;
+        }
+        pthread_mutex_unlock(&ccxt->to_read_buf_lock);
+        pthread_mutex_destroy(&ccxt->to_read_buf_lock);
+
         while (ccxt->read_counter != ccxt->read_done_counter) {
                 WLOG("Waiting read response, request counter:%lu, response counter:%lu.", ccxt->read_counter, ccxt->read_done_counter);
                 sleep(1);
@@ -220,6 +284,7 @@ static void serverOnClose(Connection *conn) {
                 WLOG("Waiting write response, request counter:%lu, response counter:%lu.", ccxt->write_counter, ccxt->write_done_counter);
                 sleep(1);
         }
+
         free(ccxt);
 }
 

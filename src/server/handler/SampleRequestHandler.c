@@ -99,9 +99,11 @@ Request* SampleRequestDecoderGet(char *buffer, size_t buff_len, size_t *consume_
 Request* SampleRequestDecoderPut(char *buffer, size_t buff_len, size_t *consume_len, bool *free_req) {
         size_t req_len;
         SamplePutRequest *req = (SamplePutRequest*)buffer;
-        req_len = sizeof(SamplePutRequest) + req->sample.path_length;
-        req->sample.path = req->sample.data;
+        req_len = sizeof(SamplePutRequest);
         if (buff_len < req_len) return NULL;
+        req_len += req->sample.path_length;
+        if (buff_len < req_len) return NULL;
+        req->sample.path = req->sample.data;
         *consume_len = req_len;
         *free_req = false;
         return &req->super;

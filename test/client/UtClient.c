@@ -57,7 +57,8 @@ int UtClient(int argv, char **argvs) {
 
         int round;
         volatile int done_number = 0;
-        for (round = 0; round < 1000000; round++) {
+        int round_max = 1000000;
+        for (round = 0; round < round_max; round++) {
                 SamplePutRequest *sput = calloc(1, sizeof(*sput) + 1024);
                 Sample *s1 = &sput->sample;
                 strcpy(s1->bucket, "buck1");
@@ -78,16 +79,13 @@ int UtClient(int argv, char **argvs) {
                         free(sput);
                 }
                 if (rc) {
-                        DLOG("Put success!!");
+                        DLOG("Put success round:%d!!", round);
                 } else {
                         __sync_add_and_fetch(&done_number, 1);
 //                        DLOG("Send request failed!!");
                 }
-                while (round - done_number > 10000) {
-                	usleep(1);
-                }
         }
-        while (done_number < 10000) {
+        while (done_number != round_max) {
                 sleep(1);
         }
         client.m->destroy(&client);
