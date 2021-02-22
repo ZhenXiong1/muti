@@ -27,7 +27,6 @@ typedef struct ServerPrivate {
 
 typedef struct SConnectionContext {
         volatile uint64_t       read_counter;
-        volatile uint64_t       read_done_counter;
         volatile uint64_t       write_counter;
         volatile uint64_t       write_done_counter;
         volatile uint64_t       received_request_counter;
@@ -47,25 +46,24 @@ static Readbuffer* serverCreateReadBuffer(ServerPrivate *priv_p) {
         return rbuf;
 }
 
-static inline void serverWakeupRead(Connection *conn_p) {
+static inline void serverReadDone(Connection *conn_p) {
         Socket* skt = conn_p->m->getSocket(conn_p);
         Server* srv = skt->m->getContext(skt);
         ServerPrivate *priv_p = srv->p;
         SConnectionContext *ccxt = conn_p->m->getContext(conn_p);
 
-        if (ccxt->to_read_buf && (int)(ccxt->received_request_counter - ccxt->sent_request_counter) < priv_p->param.max_handle_request) {
+        uint64_t left = __sync_sub_and_fetch(&ccxt->read_counter, 1);
+        if (left == priv_p->param.max_read_buffer_counter / 2) {
                 pthread_mutex_lock(&ccxt->to_read_buf_lock);
-                if (ccxt->to_read_buf) {
+                if (ccxt->to_read_buf){
                         Readbuffer *rbuf = ccxt->to_read_buf;
-                        DLOG("error:: resume rbuf:%p cnt:%lu max:%d", rbuf, ccxt->received_request_counter - ccxt->sent_request_counter, priv_p->param.max_handle_request);
-                        __sync_add_and_fetch(&ccxt->read_counter, 1);
                         bool rc = conn_p->m->read(conn_p, rbuf->buffer + rbuf->read_buffer_start,
                                         priv_p->param.read_buffer_size - rbuf->read_buffer_start,
                                         serverReadCallback, rbuf);
                         if (rc == false) {
                                 free(rbuf->buffer);
                                 free(rbuf);
-                                __sync_add_and_fetch(&ccxt->read_done_counter, 1);
+                                __sync_sub_and_fetch(&ccxt->read_counter, 1);
                         }
                         ccxt->to_read_buf = NULL;
                 }
@@ -80,7 +78,6 @@ static void serverWriteCallback(Connection* conn_p, bool rc, void *buffer) {
         }
         __sync_add_and_fetch(&ccxt->write_done_counter, 1);
         __sync_add_and_fetch(&ccxt->sent_request_counter, 1);
-        serverWakeupRead(conn_p);
         free(buffer);
 }
 
@@ -106,7 +103,6 @@ static void serverDoActionCallback(SRequest *reqw) {
                 free(buffer);
                 __sync_add_and_fetch(&ccxt->sent_request_counter, 1);
                 __sync_add_and_fetch(&ccxt->write_done_counter, 1);
-                serverWakeupRead(conn_p);
         }
         if (free_resp) {
                 free(reqw->response);
@@ -118,7 +114,7 @@ static void serverDoActionCallback(SRequest *reqw) {
         if (left == 0) {
                 free(reqw->read_buffer->buffer);
                 free(reqw->read_buffer);
-                __sync_add_and_fetch(&ccxt->read_done_counter, 1);
+                serverReadDone(conn_p);
         }
         free(reqw);
 }
@@ -136,26 +132,21 @@ static inline void serverRead(Connection* conn_p, ServerPrivate *priv_p, char *b
         memcpy(rbuf->buffer, buf, buf_len);
         rbuf->read_buffer_start = buf_len;
 
-        if (ccxt->received_request_counter - ccxt->sent_request_counter >= priv_p->param.max_handle_request) {
+        uint64_t left = __sync_add_and_fetch(&ccxt->read_counter, 1);
+        if (left == priv_p->param.max_read_buffer_counter) {
                 pthread_mutex_lock(&ccxt->to_read_buf_lock);
-                if (ccxt->received_request_counter - ccxt->sent_request_counter >= priv_p->param.max_handle_request) {
-                        assert(ccxt->to_read_buf == NULL);
-                        ccxt->to_read_buf = rbuf;
-                        // TODO replace this method
-                        DLOG("error:: temp hung rbuf:%p cnt:%lu max:%d", rbuf, ccxt->received_request_counter - ccxt->sent_request_counter, priv_p->param.max_handle_request);
-                }
+                assert(ccxt->to_read_buf == NULL);
+                ccxt->to_read_buf = rbuf;
                 pthread_mutex_unlock(&ccxt->to_read_buf_lock);
                 return;
         }
-
-        __sync_add_and_fetch(&ccxt->read_counter, 1);
         bool rc = conn_p->m->read(conn_p, rbuf->buffer + rbuf->read_buffer_start,
                         priv_p->param.read_buffer_size - rbuf->read_buffer_start,
                         serverReadCallback, rbuf);
         if (rc == false) {
                 free(rbuf->buffer);
                 free(rbuf);
-                __sync_add_and_fetch(&ccxt->read_done_counter, 1);
+                __sync_sub_and_fetch(&ccxt->read_counter, 1);
         }
 }
 
@@ -174,7 +165,7 @@ static void serverReadCallback(Connection* conn_p, bool rc, void* buffer, size_t
         if (rc == false) {
                 free(rbuf->buffer);
                 free(rbuf);
-                __sync_add_and_fetch(&ccxt->read_done_counter, 1);
+                __sync_sub_and_fetch(&ccxt->read_counter, 1);
                 return;
         }
 
@@ -243,7 +234,7 @@ out:
         if (left == 0) {
                 free(rbuf->buffer);
                 free(rbuf);
-                __sync_add_and_fetch(&ccxt->read_done_counter, 1);
+                serverReadDone(conn_p);
         }
         if (rc == false) conn_p->m->close(conn_p);
 }
@@ -272,12 +263,13 @@ static void serverOnClose(Connection *conn) {
                 free(ccxt->to_read_buf->buffer);
                 free(ccxt->to_read_buf);
                 ccxt->to_read_buf = NULL;
+                __sync_sub_and_fetch(&ccxt->read_counter, 1);
         }
         pthread_mutex_unlock(&ccxt->to_read_buf_lock);
         pthread_mutex_destroy(&ccxt->to_read_buf_lock);
 
-        while (ccxt->read_counter != ccxt->read_done_counter) {
-                WLOG("Waiting read response, request counter:%lu, response counter:%lu.", ccxt->read_counter, ccxt->read_done_counter);
+        while (ccxt->read_counter) {
+                WLOG("Waiting read response, reading counter:%lu.", ccxt->read_counter);
                 sleep(1);
         }
         while (ccxt->write_counter != ccxt->write_done_counter) {

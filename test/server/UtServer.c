@@ -27,13 +27,13 @@ int UtServer(int argv, char **argvs) {
         bool rc = initThreadPool(&work_tp, &param_tp);
         assert(rc == true);
         param.port = 10809;
-        param.read_buffer_size = 1 << 11;
+        param.read_buffer_size = 1 << 12;
         param.request_handler = ServerRequestHandlers;
         param.request_handler_length = sizeof(ServerRequestHandlers);
         DLOG("param.request_handler_length:%u", param.request_handler_length);
         param.socket_io_thread_number = 6;
         param.worker_tp = &work_tp;
-        param.max_handle_request = 1000000;
+        param.max_read_buffer_counter = 10000;
 
         rc = initServer(&server, &param);
         assert(rc == true);

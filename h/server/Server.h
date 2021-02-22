@@ -29,7 +29,7 @@ typedef struct ServerParam {
         ThreadPool      *worker_tp;
         int             port;
         size_t          read_buffer_size;
-        int             max_handle_request;
+        int             max_read_buffer_counter;
         int             socket_io_thread_number;
 } ServerParam;
 
