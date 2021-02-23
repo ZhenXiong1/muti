@@ -46,10 +46,10 @@ static int putSample(SampleDao* this, Sample *sample) {
                 map->m->put(map, &s->id, s);
                 listAddTail(&s->element, &priv_p->list);
                 priv_p->list_size++;
-                DLOG("Add new sample, id:%d", s->id);
+//                DLOG("Add new sample, id:%d", s->id);
         } else {
                 memcpy(s, sample, sizeof(*s) + sample->path_length);
-                DLOG("Replace old sample, id:%d", s->id);
+//                DLOG("Replace old sample, id:%d", s->id);
         }
         pthread_mutex_unlock(&priv_p->lock);
         return 0;

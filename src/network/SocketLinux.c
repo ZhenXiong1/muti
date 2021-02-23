@@ -117,7 +117,7 @@ static void socketPostIOJobs(ConnectionLinux *conn_p, SocketPrivate *priv_p) {
         ListHead head;
         IOContext *ioctx, *ioctx1;
 
-        sleep(1);
+//        sleep(1);
         listHeadInit(&head);
         pthread_spin_lock(&conn_p->read_jobs_head_lck);
         listJoinTailInit(&conn_p->read_jobs_head, &head);
@@ -814,7 +814,7 @@ static void destroy(Socket* obj) {
         }
         while (!listEmpty(&priv_p->conn_head)) {
                 pthread_spin_unlock(&priv_p->conn_lock);
-                sleep(1);
+                usleep(1000);
                 pthread_spin_lock(&priv_p->conn_lock);
         }
         pthread_spin_unlock(&priv_p->conn_lock);

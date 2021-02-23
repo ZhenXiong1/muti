@@ -73,11 +73,11 @@ static void clientOnClose(Connection *conn) {
 
         while (ccxt->read_counter != ccxt->read_done_counter) {
                 WLOG("Waiting read response, request counter:%lu, response counter:%lu.", ccxt->read_counter, ccxt->read_done_counter);
-                sleep(1);
+                usleep(1000);
         }
         while (ccxt->write_counter != ccxt->write_done_counter) {
                 WLOG("Waiting write response, request counter:%lu, response counter:%lu.", ccxt->write_counter, ccxt->write_done_counter);
-                sleep(1);
+                usleep(1000);
         }
         free(ccxt);
 
@@ -276,7 +276,7 @@ static void clientWriteCallback(Connection *conn, bool rc, void *cbarg) {
                 free(send_arg->wbuf);
                 free(send_arg);
         } else {
-                DLOG("Client write success\n");
+//                DLOG("Client write success\n");
                 free(send_arg->wbuf);
                 send_arg->wbuf = NULL;
                 int left = __sync_sub_and_fetch(&send_arg->ref, 1);

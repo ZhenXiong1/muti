@@ -33,11 +33,12 @@ int UtClient(int argv, char **argvs) {
         ThreadPoolParam param_tp;
 
         param_tp.do_batch = NULL;
-        param_tp.thread_number = 6;
+        param_tp.thread_number = 0;
 
         bool rc = initThreadPool(&work_tp, &param_tp);
         assert(rc == true);
 
+        param_tp.thread_number = 1;
         rc = initThreadPool(&write_tp, &param_tp);
         assert(rc == true);
 
@@ -79,7 +80,7 @@ int UtClient(int argv, char **argvs) {
                         free(sput);
                 }
                 if (rc) {
-                        DLOG("Put success round:%d!!", round);
+//                        DLOG("Put success round:%d!!", round);
                 } else {
                         __sync_add_and_fetch(&done_number, 1);
 //                        DLOG("Send request failed!!");

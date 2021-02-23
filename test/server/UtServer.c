@@ -31,9 +31,9 @@ int UtServer(int argv, char **argvs) {
         param.request_handler = ServerRequestHandlers;
         param.request_handler_length = sizeof(ServerRequestHandlers);
         DLOG("param.request_handler_length:%u", param.request_handler_length);
-        param.socket_io_thread_number = 6;
+        param.socket_io_thread_number = 1;
         param.worker_tp = &work_tp;
-        param.max_read_buffer_counter = 10000;
+        param.max_read_buffer_counter = 1000000;
 
         rc = initServer(&server, &param);
         assert(rc == true);
