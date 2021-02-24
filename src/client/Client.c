@@ -18,7 +18,7 @@
 #include <Log.h>
 #include <util/LinkedList.h>
 
-#define CLIENT_WAITING_HASH_LEN 64
+#define CLIENT_WAITING_HASH_LEN (128)
 
 typedef struct ClientPrivate {
         ClientParam             param;

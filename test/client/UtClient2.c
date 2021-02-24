@@ -1,8 +1,8 @@
 /*
- * UtClient.c
+ * UtClient2.c
  *
  *  Created on: Feb 18, 2021
- *      Author: root
+ *      Author: Zhen Xiong
  */
 
 #include <stdio.h>
@@ -11,6 +11,7 @@
 #include <assert.h>
 #include <unistd.h>
 #include <semaphore.h>
+#include <pthread.h>
 
 #include <Log.h>
 #include <client/Client.h>
@@ -26,31 +27,43 @@ static void UtClientSamplePutSendCallback(Client *client, Response *resp, void *
         __sync_add_and_fetch(done_number, 1);
 }
 
-int UtClient(int argv, char **argvs) {
+typedef struct UtClientDoTestParam {
+	ThreadPool work_tp, write_tp, read_tp;
+	volatile int done_thread;
+} UtClientDoTestParam;
+
+static volatile int the_test_id = 0;
+
+static void* UtClientDoTest(void *p) {
+	UtClientDoTestParam *tp = p;
         Client client;
         ClientParam param;
-        ThreadPool work_tp, write_tp, read_tp;
-        ThreadPoolParam param_tp;
+        bool rc;
+        int id;
 
-        param_tp.do_batch = NULL;
-        param_tp.thread_number = 0;
+	UtClientDoTestParam tp1;
+	ThreadPoolParam param_tp;
 
-        bool rc = initThreadPool(&work_tp, &param_tp);
-        assert(rc == true);
+	param_tp.do_batch = NULL;
+	param_tp.thread_number = 1;
 
-        param_tp.thread_number = 1;
-        rc = initThreadPool(&write_tp, &param_tp);
-        assert(rc == true);
+	rc = initThreadPool(&tp1.work_tp, &param_tp);
+	assert(rc == true);
 
-        rc = initThreadPool(&read_tp, &param_tp);
-        assert(rc == true);
+	param_tp.thread_number = 1;
+	rc = initThreadPool(&tp1.write_tp, &param_tp);
+	assert(rc == true);
 
+	rc = initThreadPool(&tp1.read_tp, &param_tp);
+	assert(rc == true);
+
+        id = __sync_fetch_and_add(&the_test_id, 1);
         strcpy(param.host, "127.0.0.1");
         param.port = 10809;
         param.read_buffer_size = 1 << 12;
-        param.read_tp = &read_tp;
-        param.write_tp = &write_tp;
-        param.worker_tp = &work_tp;
+        param.read_tp = &tp1.read_tp;
+        param.write_tp = &tp1.write_tp;
+        param.worker_tp = &tp1.work_tp;
         param.request_sender = ClientRequestSenders;
 
         rc = initClient(&client, &param);
@@ -58,8 +71,10 @@ int UtClient(int argv, char **argvs) {
 
         int round;
         volatile int done_number = 0;
-        int round_max = 1000000;
-        for (round = 0; round < round_max; round++) {
+        int round_max = 100000;
+        int round_start = id * round_max;
+        int round_end = id * round_max + round_max;
+        for (round = round_start; round < round_end; round++) {
                 SamplePutRequest *sput = calloc(1, sizeof(*sput) + 1024);
                 Sample *s1 = &sput->sample;
                 strcpy(s1->bucket, "buck1");
@@ -87,12 +102,54 @@ int UtClient(int argv, char **argvs) {
                 }
         }
         while (done_number != round_max) {
-                sleep(1);
+                usleep(1000);
         }
         client.m->destroy(&client);
-        read_tp.m->destroy(&read_tp);
-        write_tp.m->destroy(&write_tp);
-        work_tp.m->destroy(&work_tp);
-        return 0;
+	tp1.read_tp.m->destroy(&tp1.read_tp);
+	tp1.write_tp.m->destroy(&tp1.write_tp);
+	tp1.work_tp.m->destroy(&tp1.work_tp);
+        __sync_add_and_fetch(&tp->done_thread, 1);
+        return NULL;
 }
 
+int UtClient2(int argv, char **argvs) {
+
+	int thread_number = 10;
+	pthread_attr_t attr;
+	pthread_t thread_id;
+
+	UtClientDoTestParam tp;
+	ThreadPoolParam param_tp;
+	tp.done_thread = 0;
+
+	param_tp.do_batch = NULL;
+	param_tp.thread_number = 0;
+
+	bool rc = initThreadPool(&tp.work_tp, &param_tp);
+	assert(rc == true);
+
+	param_tp.thread_number = 0;
+	rc = initThreadPool(&tp.write_tp, &param_tp);
+	assert(rc == true);
+
+	rc = initThreadPool(&tp.read_tp, &param_tp);
+	assert(rc == true);
+
+	pthread_attr_init(&attr);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+	int i;
+	for (i = 0; i < thread_number; i++) {
+		pthread_create(&thread_id, &attr, UtClientDoTest, &tp);
+	}
+
+
+	while(thread_number != tp.done_thread) {
+		usleep(1000);
+	}
+
+	tp.read_tp.m->destroy(&tp.read_tp);
+	tp.write_tp.m->destroy(&tp.write_tp);
+	tp.work_tp.m->destroy(&tp.work_tp);
+
+	return 0;
+}
