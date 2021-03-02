@@ -8,7 +8,7 @@
 #ifndef CLIENT_SENDER_SAMPLEREQUESTSENDER_H_
 #define CLIENT_SENDER_SAMPLEREQUESTSENDER_H_
 
-#include <client/sender/RequestSender.h>
+#include <client/RequestSender.h>
 
 extern Response* SampleResponseDecoderGet(char *buffer, size_t buff_len, size_t *consume_len, bool *free_req);
 extern Response* SampleResponseDecoderPut(char *buffer, size_t buff_len, size_t *consume_len, bool *free_req);

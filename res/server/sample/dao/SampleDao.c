@@ -11,7 +11,7 @@
 #include <assert.h>
 #include <pthread.h>
 
-#include <server/dao/SampleDao.h>
+#include "SampleDao.h"
 #include <util/Map.h>
 #include <Log.h>
 

@@ -8,10 +8,11 @@
 #ifndef ServerRequestHandlers_H_
 #define ServerRequestHandlers_H_
 
-#include <server/handler/SampleRequestHandler.h>
+#include "sample/SampleRequestHandler.h"
+#include <share/Resources.h>
 
 static RequestHandler ServerRequestHandlers[] = {
-                {SampleActions, SampleRequestDecoder, SampleResponseEncoder},
+                {ResourceIdSample, SampleActions, SampleRequestDecoder, SampleResponseEncoder},
 };
 
 

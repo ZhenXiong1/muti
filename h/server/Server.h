@@ -7,14 +7,13 @@
 
 #ifndef SERVER_SERVER_H_
 #define SERVER_SERVER_H_
-#include <server/handler/RequestHandler.h>
+#include <server/RequestHandler.h>
 #include <stdbool.h>
 #include <util/ThreadPool.h>
-#include <server/ServerContext.h>
 
 typedef struct Server Server;
 typedef struct ServerMethod {
-        ServerContext*  (*getContext)(Server *);
+        void*           (*getContext)(Server *);
         void            (*destroy)(Server*);
 } ServerMethod;
 
@@ -26,6 +25,7 @@ struct Server {
 typedef struct ServerParam {
         RequestHandler  *request_handler;
         uint16_t        request_handler_length;
+        void            *context;
         ThreadPool      *worker_tp;
         int             port;
         size_t          read_buffer_size;

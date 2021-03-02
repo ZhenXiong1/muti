@@ -6,9 +6,9 @@
  */
 #include <string.h>
 
-#include <client/sender/SampleRequestSender.h>
+#include "SampleRequestSender.h"
 #include <stdbool.h>
-#include <res/Sample.h>
+#include <share/Sample.h>
 
 RequestEncoder SampleRequestEncoder[] = {
                 SampleRequestEncoderGet,

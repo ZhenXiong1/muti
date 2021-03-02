@@ -8,8 +8,14 @@
 #ifndef RES_SAMPLE_H_
 #define RES_SAMPLE_H_
 
-#include "Resource.h"
+#include <res/Resource.h>
 #include <util/LinkedList.h>
+
+typedef enum {
+        SampleRequestIdGet = 0,
+        SampleRequestIdPut = 1,
+        SampleRequestIdList = 2,
+} SampleRequestId;
 
 typedef struct Sample {
         ListElement     element;
@@ -20,12 +26,6 @@ typedef struct Sample {
         size_t          size;
         char            data[];
 } Sample;
-
-typedef enum {
-        SampleRequestIdGet = 0,
-        SampleRequestIdPut = 1,
-        SampleRequestIdList = 2,
-} SampleRequestId;
 
 typedef struct SampleGetRequest {
         Request         super;

@@ -7,7 +7,7 @@
 
 #ifndef SERVER_DAO_SAMPLEDAO_H_
 #define SERVER_DAO_SAMPLEDAO_H_
-#include <res/Sample.h>
+#include <share/Sample.h>
 #include <stdbool.h>
 
 typedef struct SampleDao SampleDao;

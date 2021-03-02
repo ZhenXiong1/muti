@@ -34,9 +34,10 @@ typedef Request* (*RequestDecoder)(char *buffer, size_t buff_len, size_t *consum
 typedef bool (*ResponseEncoder)(Response *resp, char **buffer, size_t *buff_len, bool *free_resp);
 
 struct RequestHandler {
+        int             id;
         Action          *actions;
-        RequestDecoder   *request_decoders;
-        ResponseEncoder  *response_encoders;
+        RequestDecoder  *request_decoders;
+        ResponseEncoder *response_encoders;
 };
 
 extern bool ErrorResponseEncoder(Response *resp, char **buffer, size_t *buff_len, bool *free_resp);

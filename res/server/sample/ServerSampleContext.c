@@ -1,25 +1,26 @@
 /*
- * ServerContext.c
+ * ServerSampleContext.c
  *
  *  Created on: Feb 3, 2021
  *      Author: root
  */
 
+#include "ServerSampleContext.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <server/ServerContext.h>
 
-static void destroy(ServerContext* this) {
+static void destroy(ServerSampleContext* this) {
         this->sampleDao.m->destroy(&this->sampleDao);
 }
 
-static ServerContextMethod method = {
+static ServerSampleContextMethod method = {
         .destroy = destroy,
 };
 
-bool initServerContext(ServerContext* this, ServerContextParam* param) {
+bool initServerSampleContext(ServerSampleContext* this, ServerSampleContextParam* param) {
         SampleDaoParam sd_param;
         int rc;
 

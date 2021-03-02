@@ -6,12 +6,12 @@
  */
 #include <string.h>
 
-#include <server/handler/SampleRequestHandler.h>
+#include "SampleRequestHandler.h"
 #include <stdbool.h>
-#include <res/Sample.h>
-#include <server/dao/SampleDao.h>
+#include <share/Sample.h>
+#include "dao/SampleDao.h"
 #include <server/Server.h>
-#include <server/ServerContext.h>
+#include "ServerSampleContext.h"
 #include <network/Connection.h>
 #include <network/Socket.h>
 #include <Log.h>
@@ -26,7 +26,7 @@ void SampleActionGet(SRequest *req) {
         SampleGetRequest *request = (SampleGetRequest*) req->request;
         Socket* socket = req->connection->m->getSocket(req->connection);
         Server* server = socket->m->getContext(socket);
-        ServerContext *sctx = server->m->getContext(server);
+        ServerSampleContext *sctx = server->m->getContext(server);
         SampleDao *sdao = &sctx->sampleDao;
 
         Sample* sample = sdao->m->getSample(sdao, request->id);
@@ -50,7 +50,7 @@ void SampleActionPut(SRequest *req) {
         SamplePutRequest *request = (SamplePutRequest*) req->request;
         Socket* socket = req->connection->m->getSocket(req->connection);
         Server* server = socket->m->getContext(socket);
-        ServerContext *sctx = server->m->getContext(server);
+        ServerSampleContext *sctx = server->m->getContext(server);
         SampleDao *sdao = &sctx->sampleDao;
         Sample* sample = &request->sample;
         Response *resp;
@@ -67,7 +67,7 @@ void SampleActionList(SRequest *req) {
         SampleListRequest *request = (SampleListRequest*) req->request;
         Socket* socket = req->connection->m->getSocket(req->connection);
         Server* server = socket->m->getContext(socket);
-        ServerContext *sctx = server->m->getContext(server);
+        ServerSampleContext *sctx = server->m->getContext(server);
         SampleDao *sdao = &sctx->sampleDao;
         SampleListResponse *resp = malloc(sizeof(*resp));
 

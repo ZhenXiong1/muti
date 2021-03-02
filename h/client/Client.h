@@ -10,7 +10,7 @@
 #include <stdbool.h>
 #include <res/Resource.h>
 #include <network/Socket.h>
-#include <client/sender/RequestSender.h>
+#include <client/RequestSender.h>
 
 typedef struct Client Client;
 

@@ -7,10 +7,11 @@
 
 #ifndef CLIENT_SENDER_REQUESTSENDERS_H_
 #define CLIENT_SENDER_REQUESTSENDERS_H_
-#include <client/sender/SampleRequestSender.h>
+#include "sample/SampleRequestSender.h"
+#include <share/Resources.h>
 
 static RequestSender ClientRequestSenders[] = {
-                {SampleRequestEncoder, SampleResponseDecoder},
+                {ResourceIdSample, SampleRequestEncoder, SampleResponseDecoder},
 };
 
 #endif /* CLIENT_SENDER_REQUESTSENDERS_H_ */

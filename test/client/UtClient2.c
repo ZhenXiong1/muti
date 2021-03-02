@@ -16,8 +16,8 @@
 #include <Log.h>
 #include <client/Client.h>
 #include <util/ThreadPool.h>
-#include <client/sender/RequestSenders.h>
-#include <res/Sample.h>
+#include <client/RequestSenders.h>
+#include <share/Sample.h>
 
 static void UtClientSamplePutSendCallback(Client *client, Response *resp, void *arg) {
         if (resp->error_id) {

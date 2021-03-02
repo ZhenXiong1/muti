@@ -19,7 +19,6 @@
 
 typedef struct ServerPrivate {
         ServerParam     param;
-        ServerContext   context;
         Socket          socket;
         ThreadPool      tp_read;
         ThreadPool      tp_write;
@@ -280,9 +279,9 @@ static void serverOnClose(Connection *conn) {
         free(ccxt);
 }
 
-static ServerContext* getContext(Server *srv) {
+static void* getContext(Server *srv) {
         ServerPrivate *priv_p = srv->p;
-        return &priv_p->context;
+        return priv_p->param.context;
 }
 
 static void destroy(Server* this) {
@@ -291,7 +290,6 @@ static void destroy(Server* this) {
         priv_p->socket.m->destroy(&priv_p->socket);
         priv_p->tp_read.m->destroy(&priv_p->tp_read);
         priv_p->tp_write.m->destroy(&priv_p->tp_write);
-        priv_p->context.m->destroy(&priv_p->context);
         free(priv_p);
 }
 
@@ -315,10 +313,6 @@ bool initServer(Server* this, ServerParam* param) {
         rc = initThreadPool(&priv_p->tp_read, &param_tp);
         assert(rc);
         rc = initThreadPool(&priv_p->tp_write, &param_tp);
-        assert(rc);
-
-        ServerContextParam ccp;
-        rc = initServerContext(&priv_p->context, &ccp);
         assert(rc);
 
         SocketLinuxParam linux_param;

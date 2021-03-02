@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <client/sender/RequestSender.h>
+#include <client/RequestSender.h>
 
 Response* ErrorResponseDecoder(char *buffer, size_t buff_len, size_t *consume_len, bool *free_resp) {
         size_t len = sizeof(Response);

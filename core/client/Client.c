@@ -14,7 +14,7 @@
 #include <pthread.h>
 
 #include <client/Client.h>
-#include <client/sender/RequestSender.h>
+#include <client/RequestSender.h>
 #include <Log.h>
 #include <util/LinkedList.h>
 

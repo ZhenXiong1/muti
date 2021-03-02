@@ -19,6 +19,7 @@ typedef Response* (*ResponseDecoder)(char *buffer, size_t buff_len, size_t *cons
 typedef bool (*RequestEncoder)(Request *req, char **buffer, size_t *buff_len, bool *free_req);
 
 struct RequestSender {
+        int             id;
         RequestEncoder  *request_encoders;
         ResponseDecoder *response_decoders;
 };

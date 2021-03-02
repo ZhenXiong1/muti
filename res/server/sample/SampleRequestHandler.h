@@ -7,7 +7,7 @@
 
 #ifndef RESSAMPLE_H_
 #define RESSAMPLE_H_
-#include <server/handler/RequestHandler.h>
+#include <server/RequestHandler.h>
 #include <stddef.h>
 
 extern void SampleActionGet(SRequest *);
