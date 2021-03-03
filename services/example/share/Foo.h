@@ -1,5 +1,5 @@
 /*
- * Sample.h
+ * Foo.h
  *
  *  Created on: Jan 30, 2021
  *      Author: root
@@ -12,12 +12,12 @@
 #include <util/LinkedList.h>
 
 typedef enum {
-        SampleRequestIdGet = 0,
-        SampleRequestIdPut = 1,
-        SampleRequestIdList = 2,
-} SampleRequestId;
+        FooRequestIdGet = 0,
+        FooRequestIdPut = 1,
+        FooRequestIdList = 2,
+} FooRequestId;
 
-typedef struct Sample {
+typedef struct Foo {
         ListElement     element;
         int             id;
         char            bucket[64];
@@ -25,40 +25,40 @@ typedef struct Sample {
         char            *path;
         size_t          size;
         char            data[];
-} Sample;
+} Foo;
 
-typedef struct SampleGetRequest {
+typedef struct FooGetRequest {
         Request         super;
         int             id;
-} SampleGetRequest;
+} FooGetRequest;
 
-typedef struct SampleGetResponse {
+typedef struct FooGetResponse {
         Response        super;
-        Sample          sample;
-} SampleGetResponse;
+        Foo          foo;
+} FooGetResponse;
 
-typedef struct SamplePutRequest {
+typedef struct FooPutRequest {
         Request         super;
-        Sample          sample;
-} SamplePutRequest;
+        Foo          foo;
+} FooPutRequest;
 
-typedef struct SamplePutResponse {
+typedef struct FooPutResponse {
         Response        super;
-} SamplePutResponse;
+} FooPutResponse;
 
-typedef struct SampleListRequest {
+typedef struct FooListRequest {
         Request         super;
         int32_t         page;
         int32_t         page_size;
-} SampleListRequest;
+} FooListRequest;
 
-typedef struct SampleListResponse {
+typedef struct FooListResponse {
         Response        super;
         uint32_t        length;
         union {
-        	ListHead	sample_head;	// For decoder
-        	ListHead        *sample_list;	// For encoder
+        	ListHead	foo_head;	// For decoder
+        	ListHead        *foo_list;	// For encoder
         };
-} SampleListResponse;
+} FooListResponse;
 
 #endif /* RES_SAMPLE_H_ */

@@ -1,5 +1,5 @@
 /*
- * SampleDao.c
+ * FooDao.c
  *
  *  Created on: Feb 2, 2021
  *      Author: root
@@ -11,45 +11,45 @@
 #include <assert.h>
 #include <pthread.h>
 
-#include "SampleDao.h"
+#include "FooDao.h"
 #include <util/Map.h>
 #include <Log.h>
 
-typedef struct SampleDaoPrivate {
-        SampleDaoParam          param;
+typedef struct FooDaoPrivate {
+        FooDaoParam          param;
         Map                     map;
         ListHead                list;
         int                     list_size;
         pthread_mutex_t         lock;
-} SampleDaoPrivate;
+} FooDaoPrivate;
 
-static Sample* getSample(SampleDao* this, int id) {
-        SampleDaoPrivate *priv_p = this->p;
+static Foo* getFoo(FooDao* this, int id) {
+        FooDaoPrivate *priv_p = this->p;
         Map *map = &priv_p->map;
-        Sample* s;
+        Foo* s;
         pthread_mutex_lock(&priv_p->lock);
         s = map->m->get(map, &id);
         pthread_mutex_unlock(&priv_p->lock);
         return s;
 }
 
-static int putSample(SampleDao* this, Sample *sample) {
-        SampleDaoPrivate *priv_p = this->p;
+static int putFoo(FooDao* this, Foo *foo) {
+        FooDaoPrivate *priv_p = this->p;
         Map *map = &priv_p->map;
-        Sample *s;
+        Foo *s;
 
         pthread_mutex_lock(&priv_p->lock);
-        s = map->m->get(map, &sample->id);
+        s = map->m->get(map, &foo->id);
         if (s == NULL) {
-                s = malloc(sizeof(*s) + sample->path_length);
-                memcpy(s, sample, sizeof(*s) + sample->path_length);
+                s = malloc(sizeof(*s) + foo->path_length);
+                memcpy(s, foo, sizeof(*s) + foo->path_length);
                 map->m->put(map, &s->id, s);
                 listAddTail(&s->element, &priv_p->list);
                 priv_p->list_size++;
-//                DLOG("Add new sample, id:%d", s->id);
+//                DLOG("Add new foo, id:%d", s->id);
         } else {
-                memcpy(s, sample, sizeof(*s) + sample->path_length);
-//                DLOG("Replace old sample, id:%d", s->id);
+                memcpy(s, foo, sizeof(*s) + foo->path_length);
+//                DLOG("Replace old foo, id:%d", s->id);
         }
         pthread_mutex_unlock(&priv_p->lock);
         return 0;
@@ -57,11 +57,11 @@ static int putSample(SampleDao* this, Sample *sample) {
 
 #define min(a, b) (a) < (b) ? (a) : (b)
 
-static int listSample(SampleDao* this, ListHead **head, int page, int page_size) {
-        SampleDaoPrivate *priv_p = this->p;
+static int listFoo(FooDao* this, ListHead **head, int page, int page_size) {
+        FooDaoPrivate *priv_p = this->p;
         int offset = page * page_size;
         int off = 0;
-        Sample *s;
+        Foo *s;
 
         if (offset >= priv_p->list_size) return 0;
         pthread_mutex_lock(&priv_p->lock);
@@ -77,10 +77,10 @@ static int listSample(SampleDao* this, ListHead **head, int page, int page_size)
         return min(left, page_size);
 }
 
-static void destroy(SampleDao* this) {
-        SampleDaoPrivate *priv_p = this->p;
+static void destroy(FooDao* this) {
+        FooDaoPrivate *priv_p = this->p;
         Map *map = &priv_p->map;
-        Sample **values;
+        Foo **values;
         int i;
 
         if (priv_p->list_size) {
@@ -100,25 +100,25 @@ static void destroy(SampleDao* this) {
         free(priv_p);
 }
 
-static SampleDaoMethod method = {
-        .getSample = getSample,
-        .putSample = putSample,
-        .listSample = listSample,
+static FooDaoMethod method = {
+        .getFoo = getFoo,
+        .putFoo = putFoo,
+        .listFoo = listFoo,
         .destroy = destroy,
 };
 
-static int SampleCompareMethod(void *key, void *key1) {
+static int FooCompareMethod(void *key, void *key1) {
         return (*(int *)key) - (*(int *)key1);
 }
 
-static uint64_t SampleHashMethod(void *key) {
+static uint64_t FooHashMethod(void *key) {
         return (uint64_t)(*(int *)key);
 }
 
-bool initSampleDao(SampleDao* this, SampleDaoParam* param) {
+bool initFooDao(FooDao* this, FooDaoParam* param) {
         MapHashLinkedParam map_param;
         bool rc;
-        SampleDaoPrivate *priv_p = malloc(sizeof(*priv_p));
+        FooDaoPrivate *priv_p = malloc(sizeof(*priv_p));
 
         this->p = priv_p;
         this->m = &method;
@@ -128,9 +128,9 @@ bool initSampleDao(SampleDao* this, SampleDaoParam* param) {
         priv_p->list_size = 0;
         pthread_mutex_init(&priv_p->lock, NULL);
 
-        map_param.super.compareMethod = SampleCompareMethod;
-        map_param.hashMethod = SampleHashMethod;
-        map_param.keyOffsetInValue = (uint64_t)&((Sample*)NULL)->id;
+        map_param.super.compareMethod = FooCompareMethod;
+        map_param.hashMethod = FooHashMethod;
+        map_param.keyOffsetInValue = (uint64_t)&((Foo*)NULL)->id;
         map_param.slot_size = 1 << 20;
         rc = initMapHashLinked(&priv_p->map, &map_param);
         if (rc == false) {

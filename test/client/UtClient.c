@@ -15,10 +15,11 @@
 #include <Log.h>
 #include <client/Client.h>
 #include <util/ThreadPool.h>
-#include <client/RequestSenders.h>
-#include <share/Sample.h>
 
-static void UtClientSamplePutSendCallback(Client *client, Response *resp, void *arg) {
+#include <example/client/ExampleSenders.h>
+#include <example/share/Foo.h>
+
+static void UtClientFooPutSendCallback(Client *client, Response *resp, void *arg) {
         if (resp->error_id) {
 //                ELOG("Send request failed.");
         }
@@ -51,7 +52,7 @@ int UtClient(int argv, char **argvs) {
         param.read_tp = &read_tp;
         param.write_tp = &write_tp;
         param.worker_tp = &work_tp;
-        param.request_sender = ClientRequestSenders;
+        param.request_sender = ExampleSenders;
 
         rc = initClient(&client, &param);
         assert(rc == true);
@@ -60,8 +61,8 @@ int UtClient(int argv, char **argvs) {
         volatile int done_number = 0;
         int round_max = 1000000;
         for (round = 0; round < round_max; round++) {
-                SamplePutRequest *sput = calloc(1, sizeof(*sput) + 1024);
-                Sample *s1 = &sput->sample;
+                FooPutRequest *sput = calloc(1, sizeof(*sput) + 1024);
+                Foo *s1 = &sput->foo;
                 strcpy(s1->bucket, "buck1");
                 s1->id = round;
                 s1->path = s1->data;
@@ -70,12 +71,12 @@ int UtClient(int argv, char **argvs) {
                 s1->size = 1 << 30;
 
                 Request *req = &sput->super;
-                req->request_id = SampleRequestIdPut;
-                req->resource_id = ResourceIdSample;
+                req->request_id = FooRequestIdPut;
+                req->resource_id = ResourceIdFoo;
 
                 bool free_req;
 
-                rc = client.m->sendRequest(&client, &sput->super, UtClientSamplePutSendCallback, (void*)&done_number, &free_req);
+                rc = client.m->sendRequest(&client, &sput->super, UtClientFooPutSendCallback, (void*)&done_number, &free_req);
                 if (free_req) {
                         free(sput);
                 }

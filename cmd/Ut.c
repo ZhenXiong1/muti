@@ -4,12 +4,13 @@
  *  Created on: Mar 2, 2021
  *      Author: Zhen Xiong
  */
+#include "../cmd/Ut.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
 
-#include "Ut.h"
 
 int UtThreadPool(int argv, char **argvs);
 int UtMapHashLinked(int argv, char **argvs);

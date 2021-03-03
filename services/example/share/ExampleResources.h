@@ -9,7 +9,7 @@
 #define SHARE_RESOURCES_H_
 
 typedef enum {
-        ResourceIdSample = 0
+        ResourceIdFoo = 0
 } ResourceId;
 
 #endif /* SHARE_RESOURCES_H_ */
