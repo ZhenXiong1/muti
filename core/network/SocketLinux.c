@@ -32,6 +32,7 @@ bool initSocketLinux(Socket* obj, SocketLinuxParam* param) {
 	obj->p = priv_p;
 	obj->m = &method;
 	memcpy(&priv_p->param, param, sizeof(*param));
+        
 
 	return true;
 }
